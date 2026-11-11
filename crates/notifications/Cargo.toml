@@ -8,4 +8,13 @@ license.workspace = true
 [dependencies]
 dn-core.workspace = true
 tracing.workspace = true
+crossbeam-channel.workspace = true
+
+# Windows toasts go through WinRT directly: notify-rust only exposes click events via a
+# blocking per-toast handle, while a callback can feed one shared channel.
+[target.'cfg(windows)'.dependencies]
+tauri-winrt-notification = "0.8"
+winreg = "0.55"
+
+[target.'cfg(not(windows))'.dependencies]
 notify-rust.workspace = true
