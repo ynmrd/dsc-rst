@@ -80,8 +80,15 @@ impl Backend {
             Command::JumpToMessage { channel_id, message_id } => self.jump_to(channel_id, message_id),
             Command::SendMessage { channel_id, content, reply_to, mention_reply, files, sticker_ids } => {
                 let nonce = random_nonce();
-                let label =
-                    if content.is_empty() && !files.is_empty() { format!("Uploading {} file(s)…", files.len()) } else { content.clone() };
+                let label = if !content.is_empty() {
+                    content.clone()
+                } else if !files.is_empty() {
+                    format!("Uploading {} file(s)…", files.len())
+                } else if !sticker_ids.is_empty() {
+                    "Sending sticker…".to_string()
+                } else {
+                    String::new()
+                };
                 self.store().add_pending(channel_id, nonce.clone(), label);
                 self.pending_sends
                     .insert(nonce.clone(), PendingSend { channel: channel_id, content, reply_to, mention_reply, files, sticker_ids });

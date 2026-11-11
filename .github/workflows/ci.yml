@@ -50,11 +50,11 @@ jobs:
       - name: Installer
         shell: pwsh
         run: |
-          # windows-2025 (windows-latest) no longer ships NSIS; install it when missing.
+          # windows-2025 (windows-latest) no longer ships NSIS; install a pinned version when missing.
           $candidates = @("${env:ProgramFiles(x86)}\NSIS\makensis.exe", "$env:ProgramFiles\NSIS\makensis.exe")
           $makensis = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $makensis) {
-            choco install nsis --no-progress -y
+            choco install nsis --version=3.13.0 --no-progress -y
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $makensis = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           }
