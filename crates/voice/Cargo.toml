@@ -14,3 +14,6 @@ tracing.workspace = true
 parking_lot.workspace = true
 thiserror.workspace = true
 async-trait = "0.1"
+# Not used directly: makes songbird's libopus build from vendored source on every target
+# (including the Windows cross build) instead of requiring a system library.
+opus2 = { version = "0.4", features = ["bundled"] }

@@ -93,6 +93,8 @@ pub struct Session {
     pub accounts: Vec<AccountView>,
     pub linked: Option<LinkedUser>,
     pub needs_onboarding: bool,
+    /// Offline demo data (no Discord connection); the UI shows a banner.
+    pub demo: bool,
     pub audio_inputs: Vec<String>,
     pub audio_outputs: Vec<String>,
 }
@@ -396,12 +398,11 @@ impl Store {
     fn init_read_states(&mut self, guild: Id) {
         let Some(gs) = self.guilds.get(&guild) else { return };
         for cid in gs.channel_ids.iter().chain(gs.thread_ids.iter()) {
-            if let Some(last) = self.channels.get(cid).and_then(|c| c.last_message_id) {
-                if !self.read_states.contains_key(cid) {
+            if let Some(last) = self.channels.get(cid).and_then(|c| c.last_message_id)
+                && !self.read_states.contains_key(cid) {
                     self.read_states.insert(*cid, last);
                     self.dirty_read_states.push((*cid, last));
                 }
-            }
         }
     }
 
@@ -424,14 +425,13 @@ impl Store {
             if !self.private_channels.contains(&id) {
                 self.private_channels.push(id);
             }
-            if let Some(last) = c.last_message_id {
-                if !self.read_states.contains_key(&id) {
-                    self.read_states.insert(id, last);
+            if let Some(last) = c.last_message_id
+                && let std::collections::hash_map::Entry::Vacant(e) = self.read_states.entry(id) {
+                    e.insert(last);
                     self.dirty_read_states.push((id, last));
                 }
-            }
-        } else if let Some(gid) = c.guild_id {
-            if let Some(gs) = self.guilds.get_mut(&gid) {
+        } else if let Some(gid) = c.guild_id
+            && let Some(gs) = self.guilds.get_mut(&gid) {
                 if c.kind.is_thread() {
                     let archived = c.thread_metadata.as_ref().is_some_and(|m| m.archived);
                     if archived {
@@ -443,7 +443,6 @@ impl Store {
                     gs.channel_ids.push(id);
                 }
             }
-        }
         match self.channels.get_mut(&id) {
             // Keep last_message_id monotonic; CHANNEL_UPDATE may carry a stale one.
             Some(existing) => {
@@ -458,12 +457,11 @@ impl Store {
     }
 
     fn remove_channel(&mut self, id: Id) {
-        if let Some(c) = self.channels.remove(&id) {
-            if let Some(gs) = c.guild_id.and_then(|g| self.guilds.get_mut(&g)) {
+        if let Some(c) = self.channels.remove(&id)
+            && let Some(gs) = c.guild_id.and_then(|g| self.guilds.get_mut(&g)) {
                 gs.channel_ids.retain(|x| *x != id);
                 gs.thread_ids.remove(&id);
             }
-        }
         self.private_channels.retain(|x| *x != id);
         self.messages.remove(&id);
     }
@@ -505,15 +503,14 @@ impl Store {
     fn on_message_create(&mut self, m: &Message) {
         let me = self.me();
         self.users.entry(m.author.id).or_insert_with(|| m.author.clone());
-        if let (Some(gid), Some(member)) = (m.guild_id, &m.member) {
-            if let Some(gs) = self.guilds.get_mut(&gid) {
+        if let (Some(gid), Some(member)) = (m.guild_id, &m.member)
+            && let Some(gs) = self.guilds.get_mut(&gid) {
                 gs.members.entry(m.author.id).or_insert_with(|| {
                     let mut mm = member.clone();
                     mm.user = None;
                     mm
                 });
             }
-        }
         match self.channels.get_mut(&m.channel_id) {
             Some(c) => c.last_message_id = c.last_message_id.max(Some(m.id)),
             None if m.guild_id.is_none() => {
@@ -587,11 +584,10 @@ impl Store {
         for m in &page {
             self.users.entry(m.author.id).or_insert_with(|| m.author.clone());
         }
-        if let Some(newest) = page.iter().map(|m| m.id).max() {
-            if let Some(c) = self.channels.get_mut(&channel) {
+        if let Some(newest) = page.iter().map(|m| m.id).max()
+            && let Some(c) = self.channels.get_mut(&channel) {
                 c.last_message_id = c.last_message_id.max(Some(newest));
             }
-        }
         let cap = self.cap_for(channel);
         self.touch_loaded(channel);
         self.messages.entry(channel).or_default().merge_page(page, before, reached_start, cap);

@@ -56,11 +56,10 @@ impl StressTest {
     /// Returns false when the user closes the results.
     pub fn show(&mut self, ui: &mut Ui, p: &Palette) -> bool {
         let now = Instant::now();
-        if let Some(prev) = self.last {
-            if self.done.is_none() {
+        if let Some(prev) = self.last
+            && self.done.is_none() {
                 self.stats.record(now - prev);
             }
-        }
         self.last = Some(now);
         let mut keep = true;
         egui::CentralPanel::default().frame(egui::Frame::new().fill(p.chat)).show(ui, |ui| {

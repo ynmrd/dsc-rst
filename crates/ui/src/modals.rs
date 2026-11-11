@@ -119,7 +119,7 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store) {
         }
         Modal::ImageViewer { url, original, width, height } => {
             let screen = ctx.content_rect();
-            let resp = egui::Modal::new(egui::Id::new("image-viewer")).frame(egui::Frame::NONE).show(ctx, |ui| {
+            let resp = egui::Modal::new(egui::Id::unique("image-viewer")).frame(egui::Frame::NONE).show(ctx, |ui| {
                 let max = screen.size() * 0.85;
                 let (w, h) = (width.max(1) as f32, height.max(1) as f32);
                 let s = (max.x / w).min(max.y / h).min(1.0);
@@ -229,7 +229,7 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store) {
 
 /// Standard centered dialog. Returns (content result, should_close).
 fn dialog<R>(ctx: &egui::Context, p: &crate::theme::Palette, id: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> (Option<R>, bool) {
-    let resp = egui::Modal::new(egui::Id::new(id))
+    let resp = egui::Modal::new(egui::Id::unique(id))
         .frame(egui::Frame::new().fill(p.chat).corner_radius(CornerRadius::same(8)).inner_margin(20).stroke(Stroke::new(1.0, p.divider)))
         .show(ctx, |ui| {
             ui.set_width(440.0);
@@ -246,7 +246,7 @@ fn profile(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, user_id
     let user = fetched.as_ref().map(|(u, _)| u.clone()).or_else(|| store.users.get(&user_id).cloned());
     let member = guild_id.and_then(|g| store.member(g, user_id).cloned()).or_else(|| fetched.and_then(|(_, m)| m));
     let mut open_dm = false;
-    let resp = egui::Modal::new(egui::Id::new("profile"))
+    let resp = egui::Modal::new(egui::Id::unique("profile"))
         .frame(egui::Frame::new().fill(p.floating).corner_radius(CornerRadius::same(8)))
         .show(ctx, |ui| {
             ui.set_width(340.0);
@@ -288,8 +288,8 @@ fn profile(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, user_id
                 }
                 widgets::section_label(ui, &p, "Discord member since");
                 ui.label(user_id.datetime().format("%b %d, %Y").to_string());
-                if let (Some(m), Some(gs)) = (&member, guild_id.and_then(|g| store.guilds.get(&g))) {
-                    if !m.roles.is_empty() {
+                if let (Some(m), Some(gs)) = (&member, guild_id.and_then(|g| store.guilds.get(&g)))
+                    && !m.roles.is_empty() {
                         widgets::section_label(ui, &p, "Roles");
                         ui.horizontal_wrapped(|ui| {
                             for r in m.roles.iter().filter_map(|r| gs.role(*r)) {
@@ -304,7 +304,6 @@ fn profile(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, user_id
                             }
                         });
                     }
-                }
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     if Some(user_id) != store.me() && !user.bot && widgets::primary_button(ui, &p, "Message").clicked() {
@@ -359,7 +358,7 @@ fn quick_switcher(ctx: &egui::Context, store: &Store, p: &crate::theme::Palette,
     cands.sort_by(|a, b| b.0.cmp(&a.0).then(a.2.cmp(&b.2)));
     cands.truncate(12);
     let mut picked = None;
-    let resp = egui::Modal::new(egui::Id::new("quick-switcher"))
+    let resp = egui::Modal::new(egui::Id::unique("quick-switcher"))
         .frame(egui::Frame::new().fill(p.chat).corner_radius(CornerRadius::same(8)).inner_margin(16))
         .show(ctx, |ui| {
             ui.set_width(520.0);

@@ -66,7 +66,7 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, tab: S
     let mut outcome = Outcome::Stay;
     let before = app.link.settings.read().clone();
     let mut s = before.clone();
-    egui::Area::new(egui::Id::new("settings-overlay")).fixed_pos(egui::Pos2::ZERO).order(egui::Order::Foreground).show(ctx, |ui| {
+    egui::Area::new(egui::Id::unique("settings-overlay")).fixed_pos(egui::Pos2::ZERO).order(egui::Order::Foreground).show(ctx, |ui| {
         let screen = ctx.content_rect();
         ui.painter().rect_filled(screen, CornerRadius::ZERO, p.chat);
         let nav_w = (screen.width() * 0.3).clamp(200.0, 320.0);
@@ -111,7 +111,7 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, tab: S
             ui.add_space(40.0);
         });
         let close_rect = egui::Rect::from_center_size(egui::pos2(screen.right() - 48.0, screen.top() + 52.0), vec2(36.0, 36.0));
-        let close = ui.interact(close_rect, egui::Id::new("settings-close"), egui::Sense::click());
+        let close = ui.interact(close_rect, egui::Id::unique("settings-close"), egui::Sense::click());
         ui.painter().circle_stroke(close_rect.center(), 18.0, egui::Stroke::new(2.0, if close.hovered() { p.text_strong } else { p.muted }));
         ui.painter().text(close_rect.center(), egui::Align2::CENTER_CENTER, "✕", egui::FontId::proportional(16.0), p.text);
         ui.painter().text(close_rect.center_bottom() + vec2(0.0, 10.0), egui::Align2::CENTER_TOP, "ESC", egui::FontId::proportional(11.0), p.muted);
@@ -153,14 +153,12 @@ fn account(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette) {
             });
             ui.horizontal(|ui| {
                 if ui.button("Set status…").clicked() {
-                    app.st.modal = None;
                     app.st.modal = Some(crate::state::Modal::Status { custom: String::new() });
                 }
-                if let Some(app_id) = store.session.application_id {
-                    if ui.button("Invite bot to a server ↗").clicked() {
+                if let Some(app_id) = store.session.application_id
+                    && ui.button("Invite bot to a server ↗").clicked() {
                         let _ = open::that_detached(crate::sidebar::invite_url(app_id, None));
                     }
-                }
                 if ui.button("Reconnect").clicked() {
                     app.link.send(Command::Reconnect);
                 }
@@ -369,7 +367,7 @@ fn level_meter(ui: &mut Ui, p: &Palette, level_db: f32, threshold_db: f32, auto:
 }
 
 fn keybind_capture(ui: &mut Ui, p: &Palette, value: &mut String, id: &str) {
-    let capture_id = egui::Id::new(("capture", id));
+    let capture_id = egui::Id::unique(("capture", id));
     let capturing = ui.ctx().data(|d| d.get_temp::<bool>(capture_id)).unwrap_or(false);
     let label = if capturing { "Press a key…".to_string() } else { value.clone() };
     if ui.add(egui::Button::new(RichText::new(label).monospace()).min_size(vec2(140.0, 28.0)).fill(if capturing { p.red.gamma_multiply(0.4) } else { p.input })).clicked() {

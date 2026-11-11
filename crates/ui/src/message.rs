@@ -105,7 +105,7 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, rc: &
                 let r = Rect::from_min_size(gutter.min, vec2(AVATAR, AVATAR));
                 let url = m.author.avatar_url(80);
                 widgets::paint_avatar(ui, &mut app.textures, &p, &url, r, None, false);
-                if ui.interact(r, ui.id().with(("av", m.id)), Sense::click()).clicked() {
+                if ui.interact(r, ui.scope_id().with(("av", m.id)), Sense::click()).clicked() {
                     actions.push(RichAction::Profile(m.author.id));
                 }
                 ui.horizontal(|ui| {
@@ -175,7 +175,7 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, rc: &
     if rc.mention {
         ui.painter().rect_filled(row_rect, CornerRadius::ZERO, p.mention_bg);
         ui.painter().rect_filled(Rect::from_min_size(row_rect.min, vec2(2.0, row_rect.height())), CornerRadius::ZERO, p.mention_bar);
-    } else if hovered || app.st.hovered_message == Some(m.id) && ui.ctx().is_context_menu_open() {
+    } else if hovered {
         ui.painter().rect_filled(row_rect, CornerRadius::ZERO, p.hover.gamma_multiply(0.4));
     }
     if !rc.header && hovered {
@@ -191,7 +191,7 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, rc: &
         app.st.hovered_message = Some(m.id);
         toolbar(app, ui, m, rc, row_rect, &p);
     }
-    let resp = ui.interact(row_rect, ui.id().with(("row", m.id)), Sense::click());
+    let resp = ui.interact(row_rect, ui.scope_id().with(("row", m.id)), Sense::click());
     resp.context_menu(|ui| context_menu(app, ui, store, m, rc, dev));
 
     for a in actions {
@@ -288,7 +288,7 @@ fn reply_preview(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, 
         })
         .response;
     if let Some(t) = target {
-        let r = ui.interact(resp.rect, ui.id().with(("reply", m.id)), Sense::click());
+        let r = ui.interact(resp.rect, ui.scope_id().with(("reply", m.id)), Sense::click());
         if r.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
             if store.channel_messages(m.channel_id).and_then(|cm| cm.get(t)).is_none() {
                 app.st.toast("Referenced message is not loaded; scroll up to find it.", false);
@@ -402,27 +402,27 @@ pub fn save_as(app: &mut DiscordApp, url: &str, filename: &str) {
 fn embed(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, idx: usize, e: &Embed, p: &Palette, font_size: f32, use_24h: bool, actions: &mut Vec<RichAction>) {
     let kind = e.kind.as_deref().unwrap_or("rich");
     // Media-only embeds (image/gifv) render as a plain image like attachments.
-    if matches!(kind, "image" | "gifv") {
-        if let Some(t) = e.thumbnail.as_ref().or(e.image.as_ref()) {
+    if matches!(kind, "image" | "gifv")
+        && let Some(t) = e.thumbnail.as_ref().or(e.image.as_ref()) {
             let size = fit(t.width, t.height, ui.available_width().min(400.0), 300.0);
             let src = t.proxy_url.clone().unwrap_or_else(|| t.url.clone());
             let url = dn_core::cdn::with_size_params(&src, t.width, t.height, size.x as u32 * 2, size.y as u32 * 2);
             let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
             match app.textures.get(&url, (size.x.max(size.y) * 2.0) as u32) {
                 Some(tex) => egui::Image::new((tex.id(), size)).corner_radius(CornerRadius::same(6)).paint_at(ui, rect),
-                None => ui.painter().rect_filled(rect, CornerRadius::same(6), p.embed_bg),
+                None => {
+                    ui.painter().rect_filled(rect, CornerRadius::same(6), p.embed_bg);
+                }
             }
             if kind == "gifv" {
                 ui.painter().text(rect.left_top() + vec2(6.0, 6.0), egui::Align2::LEFT_TOP, "GIF", crate::theme::bold(11.0), Color32::WHITE);
             }
-            if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
-                if let Some(u) = &e.url {
+            if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked()
+                && let Some(u) = &e.url {
                     let _ = open::that_detached(u);
                 }
-            }
             return;
         }
-    }
     let bar = e.color.map(rgb).unwrap_or(p.divider);
     let resp = egui::Frame::new()
         .fill(p.embed_bg)
@@ -452,17 +452,15 @@ fn embed(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, idx: usi
                     }
                     if let Some(a) = &e.author {
                         ui.horizontal(|ui| {
-                            if let Some(icon) = &a.icon_url {
-                                if let Some(tex) = rctx.textures.get(icon, 48) {
+                            if let Some(icon) = &a.icon_url
+                                && let Some(tex) = rctx.textures.get(icon, 48) {
                                     ui.add(egui::Image::new((tex.id(), vec2(20.0, 20.0))).corner_radius(CornerRadius::same(10)));
                                 }
-                            }
                             let r = ui.add(egui::Label::new(RichText::new(&a.name).strong().size(13.0)).sense(Sense::click()));
-                            if r.clicked() {
-                                if let Some(u) = &a.url {
+                            if r.clicked()
+                                && let Some(u) = &a.url {
                                     rctx.actions.push(RichAction::OpenUrl { url: u.clone(), masked: false });
                                 }
-                            }
                         });
                     }
                     if let Some(t) = &e.title {
@@ -510,7 +508,9 @@ fn embed(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, idx: usi
                         let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
                         match rctx.textures.get(&url, (size.x.max(size.y) * 2.0) as u32) {
                             Some(tex) => egui::Image::new((tex.id(), size)).corner_radius(CornerRadius::same(4)).paint_at(ui, rect),
-                            None => ui.painter().rect_filled(rect, CornerRadius::same(4), p.hover),
+                            None => {
+                                ui.painter().rect_filled(rect, CornerRadius::same(4), p.hover);
+                            }
                         }
                     }
                     if e.footer.is_some() || e.timestamp.is_some() {
@@ -524,8 +524,8 @@ fn embed(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, idx: usi
                         ui.label(RichText::new(parts.join(" • ")).size(11.5).color(p.muted));
                     }
                 });
-                if kind != "image" {
-                    if let Some(t) = &e.thumbnail {
+                if kind != "image"
+                    && let Some(t) = &e.thumbnail {
                         let size = fit(t.width, t.height, 80.0, 80.0);
                         let src = t.proxy_url.clone().unwrap_or_else(|| t.url.clone());
                         let url = dn_core::cdn::with_size_params(&src, t.width, t.height, 160, 160);
@@ -534,7 +534,6 @@ fn embed(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, idx: usi
                             egui::Image::new((tex.id(), size)).corner_radius(CornerRadius::same(4)).paint_at(ui, rect);
                         }
                     }
-                }
             });
         });
     let r = resp.response.rect;
@@ -549,7 +548,9 @@ fn stickers(app: &mut DiscordApp, ui: &mut Ui, m: &Message, p: &Palette) {
                 let (rect, resp) = ui.allocate_exact_size(vec2(160.0, 160.0), Sense::hover());
                 match app.textures.get(&url, 320) {
                     Some(tex) => egui::Image::new((tex.id(), rect.size())).paint_at(ui, rect),
-                    None => ui.painter().rect_filled(rect, CornerRadius::same(8), p.hover),
+                    None => {
+                        ui.painter().rect_filled(rect, CornerRadius::same(8), p.hover);
+                    }
                 }
                 resp.on_hover_text(&s.name);
             }
@@ -600,7 +601,7 @@ fn reactions(app: &mut DiscordApp, ui: &mut Ui, m: &Message, rc: &RowCtx, p: &Pa
                     });
                 })
                 .response;
-            let resp = ui.interact(resp.rect, ui.id().with(("react", m.id, r.emoji.reaction_key())), Sense::click());
+            let resp = ui.interact(resp.rect, ui.scope_id().with(("react", m.id, r.emoji.reaction_key())), Sense::click());
             if resp.on_hover_text(format!(":{}:", r.emoji.name.clone().unwrap_or_default())).clicked() && (can_react || r.me) {
                 app.link.send(Command::React { channel_id: m.channel_id, message_id: m.id, emoji: r.emoji.clone(), add: !r.me });
             }
@@ -641,7 +642,7 @@ fn toolbar(app: &mut DiscordApp, ui: &mut Ui, m: &Message, rc: &RowCtx, row: Rec
         let c = app.st.composer(m.channel_id);
         c.reply_to = Some(m.id);
         c.mention_reply = true;
-        child.ctx().memory_mut(|mem| mem.request_focus(egui::Id::new(("composer", m.channel_id))));
+        child.ctx().memory_mut(|mem| mem.request_focus(egui::Id::unique(("composer", m.channel_id))));
     }
     if own && widgets::icon_button(&mut child, p, "✏", "Edit", None).clicked() {
         app.st.editing = Some((m.id, m.content.clone()));

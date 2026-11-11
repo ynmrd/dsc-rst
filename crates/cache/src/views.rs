@@ -78,7 +78,7 @@ impl Store {
             .filter_map(|t| self.channels.get(t))
             .filter(|t| t.parent_id == Some(parent))
             .collect();
-        v.sort_by(|a, b| b.last_message_id.max(Some(b.id)).cmp(&a.last_message_id.max(Some(a.id))));
+        v.sort_by_key(|t| std::cmp::Reverse(t.last_message_id.max(Some(t.id))));
         v
     }
 
@@ -103,11 +103,10 @@ impl Store {
             if count >= MAX_MEMBER_ROWS {
                 break;
             }
-            if let Some(ow) = &overwrites {
-                if !permissions::channel_permissions(&gs.guild, *uid, m, ow).can_view() {
+            if let Some(ow) = &overwrites
+                && !permissions::channel_permissions(&gs.guild, *uid, m, ow).can_view() {
                     continue;
                 }
-            }
             let user = self.users.get(uid);
             let status = self.status_of(*uid);
             let presence = self.presences.get(uid);
@@ -151,7 +150,7 @@ impl Store {
     /// DMs most recent first.
     pub fn dm_list(&self) -> Vec<&Channel> {
         let mut v: Vec<&Channel> = self.private_channels.iter().filter_map(|c| self.channels.get(c)).collect();
-        v.sort_by(|a, b| b.last_message_id.cmp(&a.last_message_id));
+        v.sort_by_key(|c| std::cmp::Reverse(c.last_message_id));
         v
     }
 }

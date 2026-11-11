@@ -74,10 +74,10 @@ docs/  COMPATIBILITY.md, ORIGINAL_PROMPT.md
 | dn-diagnostics | ✅ готов | 17 passed |
 | dn-messaging | ✅ готов | 62 passed (вкл. фаззинг и 200 KB вход) |
 | dn-audio, dn-voice | ⏳ в работе (сабагент) | — |
-| dn-media, dn-notifications | ⏳ в работе (сабагент) | — |
-| dn-ui | 🟡 код написан (~5300 строк), **ещё ни разу не компилировался** | нужно собрать и исправить ошибки |
-| dn-client | ❌ только Cargo.toml | план ниже, раздел 6 |
-| app | ❌ заглушка | план ниже, раздел 7 |
+| dn-media, dn-notifications | ✅ готовы | по отчёту сабагента: 40 + 33 теста, clippy и Windows cross-check чистые (я их не перезапускал) |
+| dn-ui | 🟢 код написан, `cargo check` и `clippy` чистые | тесты dn-ui в процессе запуска |
+| dn-client | 🟡 код написан (`lib.rs`, `commands.rs`, `voice_glue.rs`, `desktop.rs`) по плану из раздела 6, **ещё не компилировался**: ждёт dn-audio/dn-voice | e2e-тест ещё не написан |
+| app | 🟡 код написан (`main.rs`, `demo.rs` (`--demo`), `instance.rs`, `tray.rs`, `ptt.rs`, `selfcheck.rs`, `build.rs`), иконки в `assets/` (генерируются `scripts/make_icon.py`), **ещё не компилировался** | — |
 | CI, NSIS-инсталлятор, README, бенчмарки vs официальный клиент | ❌ | раздел 8 |
 
 Все тесты выше запускал я в этой сессии. В Windows ничего ещё не запускалось. Реальное подключение к Discord не проверялось: в sandbox нет токена бота.
