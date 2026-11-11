@@ -1,6 +1,6 @@
 [package]
 name = "dn-client"
-description = "Backend orchestrator: wires API, gateway, storage, voice and auth; UI command/event bus"
+description = "Backend orchestrator: wires API, gateway, storage, voice and auth to the UI command/event bus"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,17 +11,23 @@ dn-api.workspace = true
 dn-gateway.workspace = true
 dn-auth.workspace = true
 dn-storage.workspace = true
+dn-cache.workspace = true
 dn-voice.workspace = true
 dn-audio.workspace = true
-dn-media.workspace = true
 dn-notifications.workspace = true
 dn-settings.workspace = true
-dn-diagnostics.workspace = true
-dn-messaging.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-crossbeam-channel.workspace = true
 parking_lot.workspace = true
-serde.workspace = true
 serde_json.workspace = true
-anyhow.workspace = true
+rand.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+
+[dev-dependencies]
+wiremock.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+tokio-tungstenite.workspace = true
+futures-util.workspace = true

@@ -267,6 +267,21 @@ fn around_page_replaces_window_with_gap() {
 }
 
 #[test]
+fn latest_page_without_overlap_replaces_window() {
+    let mut s = setup();
+    s.set_active_channel(Some(Id(10)));
+    s.messages_loaded(Id(10), (1..=5).map(|i| msg(i, 10, 2, "old")).collect(), None, false);
+    // Refetching the latest page after a long offline period: no overlap with 1..=5.
+    s.messages_loaded(Id(10), (50..=54).map(|i| msg(i, 10, 2, "new")).collect(), None, false);
+    let ids: Vec<u64> = s.channel_messages(Id(10)).unwrap().messages.iter().map(|m| m.id.0).collect();
+    assert_eq!(ids, vec![50, 51, 52, 53, 54]);
+    // Overlapping refresh merges and keeps older context.
+    s.messages_loaded(Id(10), (53..=56).map(|i| msg(i, 10, 2, "new")).collect(), None, false);
+    let ids: Vec<u64> = s.channel_messages(Id(10)).unwrap().messages.iter().map(|m| m.id.0).collect();
+    assert_eq!(ids, vec![50, 51, 52, 53, 54, 55, 56]);
+}
+
+#[test]
 fn reset_keeps_accounts() {
     let mut s = setup();
     s.session.accounts.push(AccountView { id: "a".into(), ..Default::default() });
