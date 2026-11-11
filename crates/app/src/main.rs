@@ -10,7 +10,7 @@ mod tray;
 
 use std::process::ExitCode;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use dn_cache::bus::{self, Command, UiLink};
 use dn_cache::{Store, StoreLimits};
@@ -28,11 +28,14 @@ struct Args {
     self_check: bool,
     network: bool,
     software: bool,
+    /// Run the UI stress test with this many messages, print the result and exit.
+    bench_stress: Option<usize>,
 }
 
 fn parse_args() -> Result<Args, String> {
     let mut a = Args::default();
-    for arg in std::env::args().skip(1) {
+    let mut it = std::env::args().skip(1);
+    while let Some(arg) = it.next() {
         match arg.as_str() {
             "--version" | "-V" => a.version = true,
             "--help" | "-h" => a.help = true,
@@ -41,6 +44,10 @@ fn parse_args() -> Result<Args, String> {
             "--self-check" => a.self_check = true,
             "--network" => a.network = true,
             "--software-render" => a.software = true,
+            "--bench-stress" => {
+                let n = it.next().and_then(|v| v.parse().ok()).filter(|n| *n > 0).ok_or("--bench-stress needs a message count")?;
+                a.bench_stress = Some(n);
+            }
             other => return Err(format!("unknown argument: {other}")),
         }
     }
@@ -51,17 +58,19 @@ const HELP: &str = "Discord Native — native desktop client for Discord (offici
 
 USAGE: discord-native [OPTIONS]
 
-  --minimized        start hidden in the tray (used by start-on-boot)
-  --demo             offline demo data, no Discord connection (UI preview / testing)
-  --self-check       check local subsystems (paths, database, credential store, audio) and exit
-  --network          with --self-check: also check that Discord's API and gateway are reachable
-  --software-render  use the OpenGL renderer instead of wgpu
-  -V, --version      print version
-  -h, --help         print this help
+  --minimized         start hidden in the tray (used by start-on-boot)
+  --demo              offline demo data, no Discord connection (UI preview / testing)
+  --self-check        check local subsystems (paths, database, credential store, audio) and exit
+  --network           with --self-check: also check that Discord's API and gateway are reachable
+  --software-render   use the OpenGL renderer instead of wgpu
+  --bench-stress <N>  scroll N synthetic messages, print frame-time statistics and exit (with --demo)
+  -V, --version       print version
+  -h, --help          print this help
 
 Environment: DN_HOME=<dir> runs in portable mode with all data under <dir>.";
 
 fn main() -> ExitCode {
+    let started = Instant::now();
     let args = match parse_args() {
         Ok(a) => a,
         Err(e) => {
@@ -160,6 +169,7 @@ fn main() -> ExitCode {
         let media = media.clone();
         let listener = instance.as_ref().and_then(|l| l.try_clone().ok());
         let notice = notice.clone();
+        let bench = args.bench_stress;
         eframe::run_native(
             APP_TITLE,
             opts,
@@ -175,7 +185,7 @@ fn main() -> ExitCode {
                         global_ptt: cfg!(windows),
                     },
                 );
-                Ok(Box::new(Shell::new(app, link, &cc.egui_ctx, listener, notice)))
+                Ok(Box::new(Shell::new(app, link, &cc.egui_ctx, listener, notice, bench, started)))
             }),
         )
     };
@@ -226,6 +236,10 @@ struct Shell {
     #[cfg(windows)]
     _tray: Option<tray::Tray>,
     last_size: Option<(f32, f32, bool)>,
+    started: Instant,
+    first_frame_logged: bool,
+    /// `--bench-stress`: print the stress-test result and quit when it finishes.
+    bench_exit: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -241,6 +255,8 @@ impl Shell {
         ctx: &egui::Context,
         listener: Option<std::net::TcpListener>,
         notice: Option<String>,
+        bench_stress: Option<usize>,
+        started: Instant,
     ) -> Self {
         let (tx, rx) = crossbeam_channel::unbounded();
         if let Some(l) = listener {
@@ -252,6 +268,9 @@ impl Shell {
             app.st.toast(text, true);
         }
         let _ = tx;
+        if let Some(n) = bench_stress {
+            app.st.stress = Some(dn_ui::stress::StressTest::new(n));
+        }
         Shell {
             app,
             link,
@@ -259,6 +278,9 @@ impl Shell {
             #[cfg(windows)]
             _tray: tray,
             last_size: None,
+            started,
+            first_frame_logged: false,
+            bench_exit: bench_stress.is_some(),
         }
     }
 }
@@ -287,6 +309,22 @@ impl eframe::App for Shell {
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.app.ui(ui, frame);
+        if !self.first_frame_logged {
+            self.first_frame_logged = true;
+            let ms = self.started.elapsed().as_secs_f64() * 1000.0;
+            tracing::info!(first_frame_ms = ms, "first frame built");
+            if self.bench_exit {
+                println!("first_frame_ms={ms:.0}");
+            }
+        }
+        if self.bench_exit
+            && let Some(result) = self.app.st.stress.as_ref().and_then(|s| s.result())
+        {
+            println!("stress: {result}");
+            self.bench_exit = false;
+            self.app.request_quit();
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+        }
     }
 
     fn on_exit(&mut self, gl: Option<&eframe::glow::Context>) {

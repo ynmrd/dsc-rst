@@ -14,6 +14,8 @@ pub struct StressTest {
     messages: Vec<(String, String)>,
     heights: HeightCache,
     stats: FrameStats,
+    /// CPU time spent building each frame (excludes tessellation and GPU work).
+    build: FrameStats,
     started: Instant,
     last: Option<Instant>,
     offset: f32,
@@ -66,6 +68,7 @@ impl StressTest {
             messages,
             heights: HeightCache::default(),
             stats: FrameStats::new(100_000),
+            build: FrameStats::new(100_000),
             started: Instant::now(),
             last: None,
             offset: 0.0,
@@ -125,13 +128,18 @@ impl StressTest {
                 self.offset += out.inner_rect.height() * 0.66;
                 if self.offset >= max || self.started.elapsed() > Duration::from_secs(60) {
                     let s = self.stats.summary();
+                    let b = self.build.summary();
                     self.done = Some(format!(
-                        "avg {:.2} ms · p95 {:.2} ms · p99 {:.2} ms · max {:.2} ms · {:.0} fps over {:.1}s",
+                        "frame interval avg {:.2} ms · p95 {:.2} · p99 {:.2} · max {:.2} ({:.0} fps) | UI build avg {:.2} ms · p95 {:.2} · max {:.2} | {} frames over {:.1}s",
                         s.avg_ms,
                         s.p95_ms,
                         s.p99_ms,
                         s.max_ms,
                         s.fps,
+                        b.avg_ms,
+                        b.p95_ms,
+                        b.max_ms,
+                        self.stats.len(),
                         self.started.elapsed().as_secs_f32()
                     ));
                     tracing::info!(result = self.done.as_deref().unwrap_or(""), messages = self.messages.len(), "UI stress test finished");
@@ -140,6 +148,9 @@ impl StressTest {
                 }
             }
         });
+        if self.done.is_none() {
+            self.build.record(now.elapsed());
+        }
         keep
     }
 
