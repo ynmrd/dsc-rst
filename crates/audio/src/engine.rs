@@ -32,7 +32,11 @@ enum Command {
     Config(AudioConfig),
     Capture(bool),
     Playback(bool),
-    StreamLost { dir: Direction, generation: u64, reason: String },
+    StreamLost {
+        dir: Direction,
+        generation: u64,
+        reason: String,
+    },
     Shutdown,
 }
 
@@ -70,12 +74,18 @@ impl AudioEngine {
         let thread = match thread {
             Ok(handle) => Some(handle),
             Err(e) => {
-                shared.events.emit(AudioEvent::Error(format!("failed to start audio thread: {e}")));
+                shared.events.emit(AudioEvent::Error(format!(
+                    "failed to start audio thread: {e}"
+                )));
                 None
             }
         };
         Self {
-            inner: Arc::new(EngineInner { shared, commands: tx, thread: Mutex::new(thread) }),
+            inner: Arc::new(EngineInner {
+                shared,
+                commands: tx,
+                thread: Mutex::new(thread),
+            }),
         }
     }
 
@@ -181,7 +191,14 @@ struct Slot {
 
 impl Slot {
     fn new() -> Self {
-        Self { wanted: false, active: None, generation: 0, retry_at: None, attempts: 0, last_error: None }
+        Self {
+            wanted: false,
+            active: None,
+            generation: 0,
+            retry_at: None,
+            attempts: 0,
+            last_error: None,
+        }
     }
 
     fn close(&mut self) {
@@ -223,8 +240,13 @@ impl AudioThread {
 
     fn run(mut self, rx: Receiver<Command>) {
         loop {
-            let deadline = [self.input.retry_at, self.output.retry_at].into_iter().flatten().min();
-            let timeout = deadline.map_or(Duration::from_secs(3600), |d| d.saturating_duration_since(Instant::now()));
+            let deadline = [self.input.retry_at, self.output.retry_at]
+                .into_iter()
+                .flatten()
+                .min();
+            let timeout = deadline.map_or(Duration::from_secs(3600), |d| {
+                d.saturating_duration_since(Instant::now())
+            });
             match rx.recv_timeout(timeout) {
                 Ok(Command::Shutdown) | Err(RecvTimeoutError::Disconnected) => break,
                 Ok(cmd) => self.handle(cmd),
@@ -271,7 +293,11 @@ impl AudioThread {
                 }
                 self.set_wanted(Direction::Output, on);
             }
-            Command::StreamLost { dir, generation, reason } => {
+            Command::StreamLost {
+                dir,
+                generation,
+                reason,
+            } => {
                 let slot = self.slot(dir);
                 if slot.generation != generation {
                     return;
@@ -370,7 +396,8 @@ impl AudioThread {
                 "{dir} device \"{wanted}\" not found, using \"{name}\""
             )));
         }
-        let supported = pick_config(&device, dir).map_err(|e| format!("{dir} device \"{name}\": {e}"))?;
+        let supported =
+            pick_config(&device, dir).map_err(|e| format!("{dir} device \"{name}\": {e}"))?;
 
         let slot = self.slot(dir);
         slot.generation += 1;
@@ -389,9 +416,14 @@ impl AudioThread {
             }
         }
         .map_err(|e| format!("{dir} device \"{name}\": {e}"))?;
-        stream.play().map_err(|e| format!("{dir} device \"{name}\": {e}"))?;
+        stream
+            .play()
+            .map_err(|e| format!("{dir} device \"{name}\": {e}"))?;
         tracing::debug!(%dir, %name, rate, channels, format = ?supported.sample_format(), "stream config");
-        Ok(ActiveStream { _stream: stream, device: name })
+        Ok(ActiveStream {
+            _stream: stream,
+            device: name,
+        })
     }
 }
 
@@ -424,9 +456,15 @@ pub(crate) fn list_devices(host: &cpal::Host, dir: Direction) -> Vec<cpal::Devic
 }
 
 /// The configured device if present, else the system default.
-fn resolve_device(host: &cpal::Host, dir: Direction, wanted: Option<&str>) -> Result<(cpal::Device, String), String> {
+fn resolve_device(
+    host: &cpal::Host,
+    dir: Direction,
+    wanted: Option<&str>,
+) -> Result<(cpal::Device, String), String> {
     if let Some(wanted) = wanted
-        && let Some(device) = list_devices(host, dir).into_iter().find(|d| device_name(d).as_deref() == Some(wanted))
+        && let Some(device) = list_devices(host, dir)
+            .into_iter()
+            .find(|d| device_name(d).as_deref() == Some(wanted))
     {
         return Ok((device, wanted.to_owned()));
     }
@@ -437,7 +475,10 @@ fn resolve_device(host: &cpal::Host, dir: Direction, wanted: Option<&str>) -> Re
 
 /// The device's default config, switched to 48 kHz when the device supports it with the same
 /// channel count and sample format.
-fn pick_config(device: &cpal::Device, dir: Direction) -> Result<SupportedStreamConfig, cpal::Error> {
+fn pick_config(
+    device: &cpal::Device,
+    dir: Direction,
+) -> Result<SupportedStreamConfig, cpal::Error> {
     let default = match dir {
         Direction::Input => device.default_input_config()?,
         Direction::Output => device.default_output_config()?,
@@ -452,12 +493,18 @@ fn pick_config(device: &cpal::Device, dir: Direction) -> Result<SupportedStreamC
     .unwrap_or_default();
     let at_48k = ranges
         .into_iter()
-        .filter(|r| r.channels() == default.channels() && r.sample_format() == default.sample_format())
+        .filter(|r| {
+            r.channels() == default.channels() && r.sample_format() == default.sample_format()
+        })
         .find_map(|r| r.try_with_sample_rate(SAMPLE_RATE));
     Ok(at_48k.unwrap_or(default))
 }
 
-fn error_callback(commands: Sender<Command>, dir: Direction, generation: u64) -> impl FnMut(cpal::Error) + Send + 'static {
+fn error_callback(
+    commands: Sender<Command>,
+    dir: Direction,
+    generation: u64,
+) -> impl FnMut(cpal::Error) + Send + 'static {
     use cpal::ErrorKind;
     move |err: cpal::Error| match err.kind() {
         ErrorKind::Xrun => tracing::trace!(%dir, "audio xrun"),
@@ -467,14 +514,21 @@ fn error_callback(commands: Sender<Command>, dir: Direction, generation: u64) ->
         | ErrorKind::StreamInvalidated
         | ErrorKind::HostUnavailable
         | ErrorKind::BackendError => {
-            drop(commands.send(Command::StreamLost { dir, generation, reason: err.to_string() }));
+            drop(commands.send(Command::StreamLost {
+                dir,
+                generation,
+                reason: err.to_string(),
+            }));
         }
         _ => tracing::warn!(%dir, error = %err, "audio stream error"),
     }
 }
 
 fn unsupported_format(format: SampleFormat) -> cpal::Error {
-    cpal::Error::with_message(cpal::ErrorKind::UnsupportedConfig, format!("unsupported sample format {format:?}"))
+    cpal::Error::with_message(
+        cpal::ErrorKind::UnsupportedConfig,
+        format!("unsupported sample format {format:?}"),
+    )
 }
 
 fn build_input<E>(

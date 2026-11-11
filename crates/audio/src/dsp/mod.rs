@@ -104,7 +104,9 @@ pub(crate) mod test_signals {
 
     /// Deterministic uniform white noise in [-amplitude, amplitude].
     pub fn noise(amplitude: f32, len: usize, seed: u64) -> Vec<f32> {
-        let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let mut state = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (0..len)
             .map(|_| {
                 state ^= state << 13;
@@ -163,7 +165,10 @@ mod tests {
         upmix_stereo_to(&[1.0, 0.0], 2, &mut out);
         assert_eq!(out, vec![1.0, 0.0]);
         upmix_stereo_to(&[1.0, -1.0, 0.5, 0.25], 6, &mut out);
-        assert_eq!(out, vec![1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.25, 0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(
+            out,
+            vec![1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.25, 0.0, 0.0, 0.0, 0.0]
+        );
     }
 
     #[test]

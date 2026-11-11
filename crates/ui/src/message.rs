@@ -269,10 +269,29 @@ fn content(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, rc: &R
     }
 }
 
+/// Single-line plain text with mentions resolved to names (reply previews, pins, search).
+pub fn plain_snippet(store: &Store, guild: Option<Id>, content: &str, max_chars: usize) -> String {
+    use dn_messaging::markdown::{Inline, parse, to_plain_text};
+    let resolve = |inl: &Inline| -> Option<String> {
+        match inl {
+            Inline::UserMention(id) => Some(format!("@{}", store.display_name(guild, *id))),
+            Inline::ChannelMention(id) => Some(format!("#{}", store.channels.get(id).map(|c| c.display_name()).unwrap_or_else(|| "unknown".into()))),
+            Inline::RoleMention(id) => Some(format!(
+                "@{}",
+                guild.and_then(|g| store.guilds.get(&g)).and_then(|g| g.role(*id)).map(|r| r.name.clone()).unwrap_or_else(|| "role".into())
+            )),
+            _ => None,
+        }
+    };
+    let text = to_plain_text(&parse(content), &resolve);
+    let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if line.chars().count() > max_chars { format!("{}…", line.chars().take(max_chars).collect::<String>()) } else { line }
+}
+
 fn reply_preview(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, p: &Palette) {
     let (name, snippet, target) = match &m.referenced_message {
         Some(r) => {
-            let snippet: String = r.content.chars().take(120).collect::<String>().replace('\n', " ");
+            let snippet = plain_snippet(store, r.guild_id.or(m.guild_id), &r.content, 120);
             let snippet = if snippet.is_empty() && !r.attachments.is_empty() { "Click to see attachment".to_string() } else { snippet };
             (format!("@{}", r.author_name()), snippet, Some(r.id))
         }

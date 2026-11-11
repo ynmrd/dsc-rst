@@ -161,7 +161,7 @@ fn pins_popup(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id,
                                     }
                                 });
                             });
-                            let snippet: String = m.content.chars().take(300).collect();
+                            let snippet = message::plain_snippet(store, m.guild_id, &m.content, 300);
                             ui.label(RichText::new(snippet).color(p.text));
                             if !m.attachments.is_empty() {
                                 ui.label(RichText::new(format!("📎 {} attachment(s)", m.attachments.len())).color(p.muted).size(12.0));
@@ -314,8 +314,10 @@ fn message_list(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: I
             list.flash = Some((target, Instant::now()));
         }
     if let Some(y) = list.scroll_to.take() {
-        forced_offset = Some(y);
+        // Callers pass f32::MAX for "bottom"; an unclamped value overflows to NaN in layout.
+        forced_offset = Some(y.clamp(0.0, total));
     }
+    let forced_offset = forced_offset.map(|y: f32| if y.is_finite() { y.clamp(0.0, total) } else { total });
     let flash = list.flash.filter(|(_, at)| at.elapsed() < Duration::from_millis(1500));
 
     let mut sa = egui::ScrollArea::vertical().id_salt(("chat", channel)).auto_shrink([false, false]).stick_to_bottom(true);
@@ -798,7 +800,7 @@ pub fn search_panel(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store) {
                     ui.label(RichText::new(message::format_time(m.timestamp_ms(), false, true)).size(11.0).color(p.faint));
                 });
                 ui.label(RichText::new(store.location_label(m.channel_id)).size(11.5).color(p.muted));
-                let snippet: String = m.content.chars().take(280).collect();
+                let snippet = message::plain_snippet(store, m.guild_id, &m.content, 280);
                 ui.label(snippet);
             });
             if ui.interact(r.response.rect, egui::Id::unique(("sr", m.id)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {

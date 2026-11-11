@@ -775,7 +775,12 @@ impl Store {
     }
 
     pub fn status_of(&self, user: Id) -> Status {
-        self.presences.get(&user).map(|p| p.status).unwrap_or(Status::Offline)
+        match self.presences.get(&user) {
+            Some(p) => p.status,
+            // Discord sends no presence for ourselves; reflect the connection instead.
+            None if Some(user) == self.me() && self.session.conn == ConnStatus::Connected => Status::Online,
+            None => Status::Offline,
+        }
     }
 
     pub fn voice_members(&self, guild: Id, channel: Id) -> Vec<&VoiceState> {

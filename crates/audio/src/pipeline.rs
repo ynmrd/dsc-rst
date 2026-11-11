@@ -1,10 +1,12 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering::Relaxed};
 
-use crate::buffers::{EventSink, FrameInfo, FrameQueue, SharedJitter, monitor_buffer, playback_buffer};
+use crate::buffers::{
+    EventSink, FrameInfo, FrameQueue, SharedJitter, monitor_buffer, playback_buffer,
+};
 use crate::dsp::{
-    AutoGain, AutoSensitivity, Gate, GateMode, NoiseSuppressor, Resampler, SILENCE_DB, downmix_to_mono, rms_db,
-    soft_clip, upmix_stereo_to,
+    AutoGain, AutoSensitivity, Gate, GateMode, NoiseSuppressor, Resampler, SILENCE_DB,
+    downmix_to_mono, rms_db, soft_clip, upmix_stereo_to,
 };
 use crate::{AudioConfig, FRAME_SAMPLES, InputMode, SAMPLE_RATE};
 
@@ -76,8 +78,10 @@ impl Shared {
     }
 
     pub fn apply_config(&self, config: &AudioConfig) {
-        self.input_gain.store(sanitize(config.input_gain, 0.0, 2.0, 1.0));
-        self.output_volume.store(sanitize(config.output_volume, 0.0, 2.0, 1.0));
+        self.input_gain
+            .store(sanitize(config.input_gain, 0.0, 2.0, 1.0));
+        self.output_volume
+            .store(sanitize(config.output_volume, 0.0, 2.0, 1.0));
         match config.mode {
             InputMode::VoiceActivity { threshold_db, auto } => {
                 let threshold_db = sanitize(threshold_db, SILENCE_DB, 0.0, -50.0);
@@ -93,7 +97,8 @@ impl Shared {
                 self.release_delay_ms.store(release_delay_ms, Relaxed);
             }
         }
-        self.noise_suppression.store(config.noise_suppression, Relaxed);
+        self.noise_suppression
+            .store(config.noise_suppression, Relaxed);
         self.auto_gain.store(config.auto_gain, Relaxed);
     }
 
@@ -104,7 +109,11 @@ impl Shared {
 }
 
 fn sanitize(v: f32, min: f32, max: f32, fallback: f32) -> f32 {
-    if v.is_finite() { v.clamp(min, max) } else { fallback }
+    if v.is_finite() {
+        v.clamp(min, max)
+    } else {
+        fallback
+    }
 }
 
 /// Short fade applied when the gate opens to avoid a click.
@@ -130,7 +139,8 @@ pub(crate) struct CaptureProcessor {
 impl CaptureProcessor {
     pub fn new(shared: Arc<Shared>, device_rate: u32, channels: usize) -> Self {
         let channels = channels.max(1);
-        let resampler = (device_rate != SAMPLE_RATE).then(|| Resampler::new(device_rate, SAMPLE_RATE, 1));
+        let resampler =
+            (device_rate != SAMPLE_RATE).then(|| Resampler::new(device_rate, SAMPLE_RATE, 1));
         Self {
             shared,
             channels,
@@ -142,7 +152,9 @@ impl CaptureProcessor {
             denoiser: NoiseSuppressor::new(),
             agc: AutoGain::new(),
             sensitivity: AutoSensitivity::new(),
-            gate: Gate::new(GateMode::VoiceActivity { threshold_db: -50.0 }),
+            gate: Gate::new(GateMode::VoiceActivity {
+                threshold_db: -50.0,
+            }),
             was_open: false,
         }
     }
@@ -191,16 +203,26 @@ impl CaptureProcessor {
         // Level and gate use the signal before AGC so the AGC cannot open the gate on noise.
         let level = rms_db(frame);
         let auto_threshold = self.sensitivity.update(level);
-        let threshold = if s.auto_threshold.load(Relaxed) { auto_threshold } else { s.threshold_db.load() };
+        let threshold = if s.auto_threshold.load(Relaxed) {
+            auto_threshold
+        } else {
+            s.threshold_db.load()
+        };
         s.effective_threshold_db.store(threshold);
 
         let mode = if s.ptt_mode.load(Relaxed) {
-            GateMode::PushToTalk { release_delay_ms: s.release_delay_ms.load(Relaxed) }
+            GateMode::PushToTalk {
+                release_delay_ms: s.release_delay_ms.load(Relaxed),
+            }
         } else {
-            GateMode::VoiceActivity { threshold_db: threshold }
+            GateMode::VoiceActivity {
+                threshold_db: threshold,
+            }
         };
         self.gate.set_mode(mode);
-        let open = self.gate.process(level, s.ptt_pressed.load(Relaxed), s.muted.load(Relaxed));
+        let open = self
+            .gate
+            .process(level, s.ptt_pressed.load(Relaxed), s.muted.load(Relaxed));
 
         if s.auto_gain.load(Relaxed) {
             self.agc.process(frame, open && level > threshold);
@@ -228,7 +250,13 @@ impl CaptureProcessor {
         if s.monitor.load(Relaxed) {
             s.monitor_buf.lock().push(frame);
         }
-        s.capture.push(frame, FrameInfo { voice_active: open, level_db: level });
+        s.capture.push(
+            frame,
+            FrameInfo {
+                voice_active: open,
+                level_db: level,
+            },
+        );
     }
 }
 
@@ -252,7 +280,8 @@ impl PlaybackRenderer {
         Self {
             shared,
             channels: channels.max(1),
-            resampler: (device_rate != SAMPLE_RATE).then(|| Resampler::new(SAMPLE_RATE, device_rate, 2)),
+            resampler: (device_rate != SAMPLE_RATE)
+                .then(|| Resampler::new(SAMPLE_RATE, device_rate, 2)),
             chunk: Vec::with_capacity(16384),
             monitor: Vec::with_capacity(8192),
             pending: Vec::with_capacity(32768),
@@ -265,7 +294,11 @@ impl PlaybackRenderer {
         let frames = out.len() / self.channels;
         while self.pending.len() / 2 < frames {
             let need = frames - self.pending.len() / 2;
-            let chunk_frames = if self.resampler.is_some() { Self::RESAMPLE_CHUNK_FRAMES } else { need };
+            let chunk_frames = if self.resampler.is_some() {
+                Self::RESAMPLE_CHUNK_FRAMES
+            } else {
+                need
+            };
             self.pull(chunk_frames);
             match &mut self.resampler {
                 Some(rs) => rs.process(&self.chunk, &mut self.pending),
@@ -302,7 +335,13 @@ impl PlaybackRenderer {
             self.monitor.clear();
             self.monitor.resize(frames, 0.0);
             s.monitor_buf.lock().pop_into(&mut self.monitor);
-            for (pair, m) in self.chunk.as_chunks_mut::<2>().0.iter_mut().zip(&self.monitor) {
+            for (pair, m) in self
+                .chunk
+                .as_chunks_mut::<2>()
+                .0
+                .iter_mut()
+                .zip(&self.monitor)
+            {
                 pair[0] += m;
                 pair[1] += m;
             }
@@ -321,7 +360,13 @@ mod tests {
     }
 
     fn vad_config(threshold_db: f32) -> AudioConfig {
-        AudioConfig { mode: InputMode::VoiceActivity { threshold_db, auto: false }, ..AudioConfig::default() }
+        AudioConfig {
+            mode: InputMode::VoiceActivity {
+                threshold_db,
+                auto: false,
+            },
+            ..AudioConfig::default()
+        }
     }
 
     #[test]
@@ -358,7 +403,10 @@ mod tests {
         let mut out = [1.0; FRAME_SAMPLES];
         let info = reader.read_frame(&mut out).unwrap();
         assert!(!info.voice_active);
-        assert!(out.iter().all(|&s| s == 0.0), "closed gate must emit silence");
+        assert!(
+            out.iter().all(|&s| s == 0.0),
+            "closed gate must emit silence"
+        );
 
         shared.muted.store(true, Relaxed);
         let loud = sine(500.0, SAMPLE_RATE, 0.8, FRAME_SAMPLES);
@@ -374,7 +422,9 @@ mod tests {
     #[test]
     fn push_to_talk_follows_key() {
         let shared = shared(AudioConfig {
-            mode: InputMode::PushToTalk { release_delay_ms: 0 },
+            mode: InputMode::PushToTalk {
+                release_delay_ms: 0,
+            },
             ..AudioConfig::default()
         });
         let mut reader = shared.capture.reader();
@@ -392,7 +442,10 @@ mod tests {
     #[test]
     fn auto_threshold_is_published() {
         let shared = shared(AudioConfig {
-            mode: InputMode::VoiceActivity { threshold_db: -10.0, auto: true },
+            mode: InputMode::VoiceActivity {
+                threshold_db: -10.0,
+                auto: true,
+            },
             ..AudioConfig::default()
         });
         let mut proc = CaptureProcessor::new(shared.clone(), SAMPLE_RATE, 1);
@@ -400,12 +453,18 @@ mod tests {
         for _ in 0..200 {
             proc.process(&silence);
         }
-        assert_eq!(shared.effective_threshold_db.load(), AutoSensitivity::MIN_THRESHOLD_DB);
+        assert_eq!(
+            shared.effective_threshold_db.load(),
+            AutoSensitivity::MIN_THRESHOLD_DB
+        );
     }
 
     #[test]
     fn playback_renders_volume_resampled_and_upmixed() {
-        let shared = shared(AudioConfig { output_volume: 0.5, ..AudioConfig::default() });
+        let shared = shared(AudioConfig {
+            output_volume: 0.5,
+            ..AudioConfig::default()
+        });
         let mut writer = PlaybackWriter::new(shared.playback.clone());
         let tone = sine(1000.0, SAMPLE_RATE, 0.8, 4800);
         let stereo: Vec<f32> = tone.iter().flat_map(|s| [*s, *s]).collect();
@@ -420,7 +479,10 @@ mod tests {
         }
         let steady = &rendered[500..];
         let level = rms_db(steady);
-        assert!((level - (rms_db(&tone) - 6.02)).abs() < 0.3, "level {level}");
+        assert!(
+            (level - (rms_db(&tone) - 6.02)).abs() < 0.3,
+            "level {level}"
+        );
 
         shared.deafened.store(true, Relaxed);
         renderer.render(&mut out);
@@ -440,6 +502,9 @@ mod tests {
         let tone = sine(440.0, SAMPLE_RATE, 0.5, FRAME_SAMPLES * 3);
         proc.process(&tone);
         renderer.render(&mut out);
-        assert!(out.iter().any(|&s| s != 0.0), "monitor audio reaches playback");
+        assert!(
+            out.iter().any(|&s| s != 0.0),
+            "monitor audio reaches playback"
+        );
     }
 }

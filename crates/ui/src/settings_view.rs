@@ -523,11 +523,11 @@ fn diagnostics(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette
         ]);
     });
     card(ui, p, |ui| {
-        widgets::section_label(ui, p, "Rendering (frames actually drawn; idle = no frames)");
+        widgets::section_label(ui, p, "UI frame build time (CPU; no frames are drawn while idle)");
         grid(ui, vec![
-            ("Average frame interval", format!("{:.1} ms", fs.avg_ms)),
-            ("p95 / p99", format!("{:.1} / {:.1} ms", fs.p95_ms, fs.p99_ms)),
-            ("Effective FPS while active", format!("{:.0}", fs.fps)),
+            ("Average per frame", format!("{:.2} ms", fs.avg_ms)),
+            ("p95 / p99 / max", format!("{:.2} / {:.2} / {:.2} ms", fs.p95_ms, fs.p99_ms, fs.max_ms)),
+            ("CPU-bound FPS ceiling", format!("{:.0}", fs.fps)),
             ("GPU textures", format!("{tex_n} ({})", widgets::human_size(tex_b as u64))),
         ]);
     });

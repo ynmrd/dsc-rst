@@ -24,7 +24,12 @@ impl Resampler {
             let fs = f64::from(in_rate);
             // Q values of the two sections of a 4th-order Butterworth.
             (0..channels)
-                .map(|_| [Biquad::lowpass(fs, cutoff, 0.541_196), Biquad::lowpass(fs, cutoff, 1.306_563)])
+                .map(|_| {
+                    [
+                        Biquad::lowpass(fs, cutoff, 0.541_196),
+                        Biquad::lowpass(fs, cutoff, 1.306_563),
+                    ]
+                })
                 .collect()
         } else {
             Vec::new()
@@ -194,7 +199,11 @@ mod tests {
     fn downsample_stereo_48k_to_44k1() {
         let left = sine(1000.0, 48_000, 0.5, 48_000);
         let right = sine(3000.0, 48_000, 0.5, 48_000);
-        let input: Vec<f32> = left.iter().zip(&right).flat_map(|(l, r)| [*l, *r]).collect();
+        let input: Vec<f32> = left
+            .iter()
+            .zip(&right)
+            .flat_map(|(l, r)| [*l, *r])
+            .collect();
         let mut rs = Resampler::new(48_000, 44_100, 2);
         // Odd chunk sizes, as delivered by real device callbacks.
         let out = run_chunked(&mut rs, &input, 333);

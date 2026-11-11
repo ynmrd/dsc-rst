@@ -24,7 +24,7 @@ const FONTS: Candidates = Candidates {
     italic: &["C:\\Windows\\Fonts\\segoeuii.ttf"],
     bold_italic: &["C:\\Windows\\Fonts\\segoeuiz.ttf"],
     mono: &["C:\\Windows\\Fonts\\consola.ttf"],
-    symbols: &["C:\\Windows\\Fonts\\seguisym.ttf"],
+    symbols: &["C:\\Windows\\Fonts\\seguiemj.ttf", "C:\\Windows\\Fonts\\seguisym.ttf"],
 };
 
 #[cfg(not(windows))]

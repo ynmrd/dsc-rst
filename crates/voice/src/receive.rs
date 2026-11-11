@@ -9,7 +9,11 @@ pub(crate) const TICK_SAMPLES: usize = FRAME_SAMPLES * 2;
 
 /// Mixes decoded i16 stereo PCM from every speaker into `out` with per-source volume, then
 /// soft-clips. Deafened output is silence.
-pub(crate) fn mix_tick<'a>(out: &mut [f32], sources: impl IntoIterator<Item = (&'a [i16], f32)>, deafened: bool) {
+pub(crate) fn mix_tick<'a>(
+    out: &mut [f32],
+    sources: impl IntoIterator<Item = (&'a [i16], f32)>,
+    deafened: bool,
+) {
     out.fill(0.0);
     if deafened {
         return;
@@ -75,7 +79,10 @@ impl SpeakingTracker {
     pub const DEFAULT_HANGOVER_TICKS: u32 = 5;
 
     pub fn new(hangover_ticks: u32) -> Self {
-        Self { hangover_ticks, silent_ticks: HashMap::new() }
+        Self {
+            hangover_ticks,
+            silent_ticks: HashMap::new(),
+        }
     }
 
     /// Feeds one tick; returns `(user, speaking)` transitions sorted by user.
@@ -175,7 +182,7 @@ mod tests {
         assert!(t.tick(&[b]).is_empty());
         assert!(t.tick(&[b]).is_empty());
         assert_eq!(t.tick(&[b]), vec![(a, false)]);
-        assert_eq!(t.tick(&[a]), vec![(a, true)]);
+        assert_eq!(t.tick(&[a, b]), vec![(a, true)]);
         assert!(t.tick(&[]).is_empty());
         assert!(t.tick(&[]).is_empty());
         assert_eq!(t.tick(&[]), vec![(a, false), (b, false)]);

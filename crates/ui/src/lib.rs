@@ -56,7 +56,7 @@ pub struct DiscordApp {
     frame_stats: dn_diagnostics::FrameStats,
     metrics: dn_diagnostics::MetricsSampler,
     last_sample: (Instant, dn_diagnostics::ProcessSample),
-    last_frame: Option<Instant>,
+
     md_cache: HashMap<(Id, u64), Arc<Vec<Block>>>,
     has_tray: bool,
     global_ptt: bool,
@@ -83,7 +83,7 @@ impl DiscordApp {
             frame_stats: dn_diagnostics::FrameStats::new(240),
             metrics: dn_diagnostics::MetricsSampler::new(),
             last_sample: (Instant::now(), Default::default()),
-            last_frame: None,
+
             md_cache: HashMap::new(),
             has_tray: opts.has_tray,
             global_ptt: opts.global_ptt,
@@ -370,12 +370,8 @@ impl DiscordApp {
             }
     }
 
-    fn frame_metrics(&mut self) {
+    fn sample_process(&mut self) {
         let now = Instant::now();
-        if let Some(prev) = self.last_frame {
-            self.frame_stats.record(now - prev);
-        }
-        self.last_frame = Some(now);
         if now.duration_since(self.last_sample.0) > Duration::from_secs(2) {
             self.last_sample = (now, self.metrics.sample());
         }
@@ -419,7 +415,8 @@ impl eframe::App for DiscordApp {
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        self.frame_metrics();
+        let frame_start = Instant::now();
+        self.sample_process();
         self.apply_settings(&ctx);
         self.textures.begin_frame(&ctx);
         self.handle_dropped_files(&ctx);
@@ -442,6 +439,8 @@ impl eframe::App for DiscordApp {
         }
         drop(store);
         self.toasts(&ctx);
+        // CPU time to build this frame (tessellation and GPU work happen after `ui` returns).
+        self.frame_stats.record(frame_start.elapsed());
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

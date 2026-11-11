@@ -17,7 +17,7 @@ fn windows_resources() {
     res.set("ProductName", "Discord Native");
     res.set("FileDescription", "Discord Native");
     res.set("CompanyName", "Discord Native contributors");
-    res.set("LegalCopyright", "MIT OR Apache-2.0. Not affiliated with Discord Inc.");
+    res.set("LegalCopyright", "MIT License. Not affiliated with Discord Inc.");
     if let Err(e) = res.compile() {
         println!("cargo:warning=embedding Windows resources failed: {e}");
     }
@@ -37,7 +37,7 @@ fn cross_windows_resources() {
         "1 ICON \"{icon}\"\n\
          1 VERSIONINFO\nFILEVERSION {a},{b},{c},0\nPRODUCTVERSION {a},{b},{c},0\nBEGIN\n BLOCK \"StringFileInfo\"\n BEGIN\n  BLOCK \"040904b0\"\n  BEGIN\n\
            VALUE \"ProductName\", \"Discord Native\"\n   VALUE \"FileDescription\", \"Discord Native\"\n   VALUE \"FileVersion\", \"{version}\"\n\
-           VALUE \"ProductVersion\", \"{version}\"\n   VALUE \"LegalCopyright\", \"MIT OR Apache-2.0. Not affiliated with Discord Inc.\"\n  END\n END\n\
+           VALUE \"ProductVersion\", \"{version}\"\n   VALUE \"LegalCopyright\", \"MIT License. Not affiliated with Discord Inc.\"\n  END\n END\n\
          BLOCK \"VarFileInfo\"\n BEGIN\n  VALUE \"Translation\", 0x409, 1200\n END\nEND\n",
         icon = icon.display().to_string().replace('\\', "/"),
         a = v(0),

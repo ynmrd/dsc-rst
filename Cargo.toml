@@ -7,7 +7,7 @@ default-members = ["crates/app"]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/ynmrd/dsc-rst"
 authors = ["Discord Native contributors"]
 
@@ -68,7 +68,7 @@ nnnoiseless = { version = "0.5", default-features = false }
 
 # UI
 eframe = { version = "0.37", default-features = false, features = ["wgpu", "glow", "default_fonts", "accesskit", "wayland", "x11", "clipboard", "links"] }
-egui = "0.37"
+egui = { version = "0.37", features = ["monochrome_emoji_fonts"] }
 egui_kittest = "0.37"
 emojis = "0.9"
 

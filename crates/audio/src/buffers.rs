@@ -36,7 +36,10 @@ impl FrameQueue {
     }
 
     pub fn push(&self, samples: &[f32; FRAME_SAMPLES], info: FrameInfo) {
-        let mut frame = CaptureFrame { samples: *samples, info };
+        let mut frame = CaptureFrame {
+            samples: *samples,
+            info,
+        };
         for _ in 0..2 {
             match self.tx.try_send(frame) {
                 Ok(()) => return,
@@ -54,7 +57,9 @@ impl FrameQueue {
     }
 
     pub fn reader(&self) -> CaptureReader {
-        CaptureReader { rx: self.rx.clone() }
+        CaptureReader {
+            rx: self.rx.clone(),
+        }
     }
 }
 
@@ -113,7 +118,11 @@ impl JitterBuffer {
         if !self.primed && self.buf.len() >= self.prebuffer_len.max(1) {
             self.primed = true;
         }
-        let n = if self.primed { out.len().min(self.buf.len()) } else { 0 };
+        let n = if self.primed {
+            out.len().min(self.buf.len())
+        } else {
+            0
+        };
         for (dst, src) in out.iter_mut().zip(self.buf.drain(..n)) {
             *dst = src;
         }
@@ -138,12 +147,18 @@ pub(crate) type SharedJitter = Arc<Mutex<JitterBuffer>>;
 
 /// Playback queue: stereo, capped at 120 ms, 40 ms prebuffer.
 pub(crate) fn playback_buffer() -> SharedJitter {
-    Arc::new(Mutex::new(JitterBuffer::new(ms_to_samples(120, 2), ms_to_samples(40, 2))))
+    Arc::new(Mutex::new(JitterBuffer::new(
+        ms_to_samples(120, 2),
+        ms_to_samples(40, 2),
+    )))
 }
 
 /// Mic-test monitor queue: mono, capped at 100 ms, 40 ms prebuffer.
 pub(crate) fn monitor_buffer() -> SharedJitter {
-    Arc::new(Mutex::new(JitterBuffer::new(ms_to_samples(100, 1), ms_to_samples(40, 1))))
+    Arc::new(Mutex::new(JitterBuffer::new(
+        ms_to_samples(100, 1),
+        ms_to_samples(40, 1),
+    )))
 }
 
 pub(crate) const fn ms_to_samples(ms: usize, channels: usize) -> usize {
@@ -211,7 +226,10 @@ mod tests {
     use super::*;
 
     fn info(active: bool) -> FrameInfo {
-        FrameInfo { voice_active: active, level_db: -30.0 }
+        FrameInfo {
+            voice_active: active,
+            level_db: -30.0,
+        }
     }
 
     #[test]
@@ -246,7 +264,10 @@ mod tests {
 
         let mut big = [7.0; 120];
         assert_eq!(jb.pop_into(&mut big), 90);
-        assert!(big[90..].iter().all(|&s| s == 0.0), "underrun is zero-filled");
+        assert!(
+            big[90..].iter().all(|&s| s == 0.0),
+            "underrun is zero-filled"
+        );
         jb.push(&[1.0; 20]);
         assert_eq!(jb.pop_into(&mut out), 0, "re-primes after an underrun");
     }
@@ -259,7 +280,11 @@ mod tests {
         for _ in 0..20 {
             writer.write(&chunk);
         }
-        assert!((writer.buffered_ms() - 120.0).abs() < 0.01, "{}", writer.buffered_ms());
+        assert!(
+            (writer.buffered_ms() - 120.0).abs() < 0.01,
+            "{}",
+            writer.buffered_ms()
+        );
         assert_eq!(writer.write(&[0.5; 3]), 2, "odd trailing sample ignored");
     }
 

@@ -181,12 +181,11 @@ fn main() -> ExitCode {
     };
 
     let mut result = launch(if use_wgpu { eframe::Renderer::Wgpu } else { eframe::Renderer::Glow });
-    if let Err(e) = &result {
-        if use_wgpu {
+    if let Err(e) = &result
+        && use_wgpu {
             tracing::warn!("wgpu renderer failed ({e}); retrying with OpenGL");
             result = launch(eframe::Renderer::Glow);
         }
-    }
 
     ui_link.send(Command::Shutdown);
     if let Some(h) = backend {
@@ -215,7 +214,7 @@ fn native_options(s: &Settings, renderer: eframe::Renderer, hidden: bool) -> efr
         .with_visible(!hidden)
         .with_icon(Arc::new(icon))
         .with_drag_and_drop(true);
-    eframe::NativeOptions { viewport, renderer, vsync: true, ..Default::default() }
+    eframe::NativeOptions { viewport, renderer, ..Default::default() }
 }
 
 /// Wraps the UI with shell concerns: tray, single-instance activation, window state.

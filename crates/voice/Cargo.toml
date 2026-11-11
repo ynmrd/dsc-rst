@@ -8,7 +8,9 @@ license.workspace = true
 [dependencies]
 dn-core.workspace = true
 dn-audio.workspace = true
-songbird.workspace = true
+# songbird 0.6.1's driver imports `dashmap`, which only its `gateway` feature enables; that
+# feature adds songbird's call manager but no Discord library (serenity/twilight stay off).
+songbird = { workspace = true, features = ["gateway"] }
 tokio.workspace = true
 tracing.workspace = true
 parking_lot.workspace = true
@@ -17,3 +19,6 @@ async-trait = "0.1"
 # Not used directly: makes songbird's libopus build from vendored source on every target
 # (including the Windows cross build) instead of requiring a system library.
 opus2 = { version = "0.4", features = ["bundled"] }
+# Not used directly: songbird decodes its raw f32 input format (our microphone track) with
+# symphonia's PCM codec but does not enable it itself.
+symphonia = { version = "0.5", default-features = false, features = ["pcm"] }

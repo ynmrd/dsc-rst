@@ -326,17 +326,14 @@ impl Backend {
 
     async fn open_channel(&mut self, channel: Id) {
         let needs_cache = self.store().channel_messages(channel).is_none_or(|cm| !cm.loaded_once);
-        if needs_cache {
-            if let Some(storage) = self.storage.clone() {
-                if let Ok(Ok(cached)) = storage.call(move |s| s.load_messages(channel, None, PAGE as usize)).await {
-                    if !cached.is_empty() {
+        if needs_cache
+            && let Some(storage) = self.storage.clone()
+                && let Ok(Ok(cached)) = storage.call(move |s| s.load_messages(channel, None, PAGE as usize)).await
+                    && !cached.is_empty() {
                         // Shown immediately; the REST page below reconciles edits/deletions.
                         self.store().messages_loaded(channel, cached, None, false);
                         self.link.repaint.now();
                     }
-                }
-            }
-        }
         let fresh = self.last_fetch.get(&channel).is_some_and(|t| t.elapsed() < Duration::from_secs(30));
         if !fresh || needs_cache {
             self.fetch_latest(channel);

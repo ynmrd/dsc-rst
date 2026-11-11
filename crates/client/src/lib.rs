@@ -34,19 +34,35 @@ pub struct BackendConfig {
     pub notifications: bool,
     pub audio: bool,
     pub oauth_api_base: String,
+    /// Shown once at startup (e.g. credential store unavailable).
+    pub startup_warning: Option<String>,
 }
 
 impl BackendConfig {
     pub fn production(paths: Paths) -> Self {
+        let keyring = dn_auth::KeyringStore::new("DiscordNative");
+        // Never fall back to writing tokens to disk: without a working OS store they are
+        // kept in memory for this session only.
+        let (secret_store, startup_warning): (Arc<dyn SecretStore>, _) = match keyring.get("probe") {
+            Ok(_) => (Arc::new(keyring), None),
+            Err(e) => {
+                tracing::error!("credential store unavailable: {e}");
+                (
+                    Arc::new(dn_auth::MemoryStore::default()),
+                    Some(format!("The system credential store is unavailable ({e}). Tokens will be forgotten when you close the app.")),
+                )
+            }
+        };
         BackendConfig {
             paths,
             api_base: dn_core::API_BASE.to_string(),
             gateway_url: None,
             gateway_timings: None,
-            secret_store: Arc::new(dn_auth::KeyringStore::new("DiscordNative")),
+            secret_store,
             notifications: true,
             audio: true,
             oauth_api_base: dn_core::API_BASE.to_string(),
+            startup_warning,
         }
     }
 }
@@ -70,7 +86,6 @@ pub(crate) struct Session {
     pub rest: RestClient,
     pub gateway: Option<GatewayHandle>,
     pub intents: Intents,
-    pub generation: u64,
 }
 
 pub(crate) struct PendingSend {
@@ -148,6 +163,9 @@ impl Backend {
             }
         };
         let settings = link.settings.read().clone();
+        if let Some(w) = &cfg.startup_warning {
+            link.toast(w.clone(), true);
+        }
         let audio = cfg.audio.then(|| dn_audio::AudioEngine::new(voice_glue::audio_config(&settings)));
         let voice = audio.as_ref().map(|a| dn_voice::VoiceManager::new(a.clone(), voice_tx));
         let notifier = cfg.notifications.then(|| Arc::new(dn_notifications::Notifier::new("Discord Native", None)));
@@ -377,17 +395,15 @@ impl Backend {
 
     pub(crate) async fn stop_session(&mut self) {
         self.flush().await;
-        if self.voice_pending.take().is_some() {
-            if let Some(v) = &self.voice {
+        if self.voice_pending.take().is_some()
+            && let Some(v) = &self.voice {
                 v.disconnect().await;
             }
-        }
-        if let Some(s) = self.session.take() {
-            if let Some(g) = s.gateway {
+        if let Some(s) = self.session.take()
+            && let Some(g) = s.gateway {
                 // Bounded: a hung socket must not block account switching or exit.
                 let _ = tokio::time::timeout(Duration::from_secs(3), g.shutdown()).await;
             }
-        }
         self.session_gen += 1;
         self.pending_sends.clear();
         self.last_fetch.clear();
@@ -484,7 +500,7 @@ impl Backend {
                 }
             }
         });
-        self.session = Some(Session { account_id, rest, gateway: Some(handle), intents, generation });
+        self.session = Some(Session { account_id, rest, gateway: Some(handle), intents });
         self.store().session.conn = ConnStatus::Connecting;
         self.link.repaint.now();
         self.load_linked_identity();
@@ -590,7 +606,6 @@ impl Backend {
                 }
             }
             GatewayEvent::Warning(w) => tracing::warn!("gateway: {w}"),
-            GatewayEvent::Command(_) | GatewayEvent::Shutdown => {}
         }
         self.link.repaint.now();
     }
@@ -733,16 +748,6 @@ impl Backend {
         }
     }
 
-    pub(crate) fn persist_messages(&self, msgs: Vec<Message>) {
-        if msgs.is_empty() {
-            return;
-        }
-        if let Some(storage) = self.storage.clone() {
-            tokio::spawn(async move {
-                let _ = storage.call(move |s| s.upsert_messages(&msgs)).await;
-            });
-        }
-    }
 
     fn prune(&self) {
         let Some(storage) = self.storage.clone() else { return };
