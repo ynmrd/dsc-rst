@@ -38,9 +38,7 @@ pub const RECOMMENDED_BOT_PERMISSIONS: u64 = Permissions::VIEW_CHANNEL.0
 
 /// URL that lets the user add their own bot to a server they manage.
 pub fn bot_invite_url(application_id: Id, permissions: u64, guild_id: Option<Id>) -> String {
-    let mut url = format!(
-        "https://discord.com/oauth2/authorize?client_id={application_id}&scope=bot&permissions={permissions}"
-    );
+    let mut url = format!("https://discord.com/oauth2/authorize?client_id={application_id}&scope=bot&permissions={permissions}");
     if let Some(guild) = guild_id {
         url.push_str(&format!("&guild_id={guild}&disable_guild_select=true"));
     }
@@ -57,12 +55,7 @@ pub struct UserSummary {
 
 impl From<&User> for UserSummary {
     fn from(u: &User) -> Self {
-        Self {
-            id: u.id,
-            username: u.username.clone(),
-            global_name: u.global_name.clone(),
-            avatar: u.avatar.clone(),
-        }
+        Self { id: u.id, username: u.username.clone(), global_name: u.global_name.clone(), avatar: u.avatar.clone() }
     }
 }
 
@@ -98,11 +91,7 @@ struct AccountsFile {
 
 impl Default for AccountsFile {
     fn default() -> Self {
-        Self {
-            version: SCHEMA_VERSION,
-            active: None,
-            accounts: Vec::new(),
-        }
+        Self { version: SCHEMA_VERSION, active: None, accounts: Vec::new() }
     }
 }
 
@@ -140,10 +129,7 @@ fn normalize_bot_token(raw: &str) -> Result<String, AuthError> {
     if t.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("bot ")) {
         t = t[4..].trim_start();
     }
-    if t.is_empty()
-        || t.eq_ignore_ascii_case("bot")
-        || t.chars().any(|c| c.is_whitespace() || c.is_control())
-    {
+    if t.is_empty() || t.eq_ignore_ascii_case("bot") || t.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return Err(AuthError::InvalidToken);
     }
     Ok(t.to_string())
@@ -156,10 +142,7 @@ fn random_account_id() -> String {
 }
 
 fn backup_path(path: &Path) -> PathBuf {
-    let mut name = path
-        .file_name()
-        .map(|n| n.to_os_string())
-        .unwrap_or_default();
+    let mut name = path.file_name().map(|n| n.to_os_string()).unwrap_or_default();
     name.push(".corrupt");
     path.with_file_name(name)
 }
@@ -173,10 +156,7 @@ impl AccountManager {
                 Ok(f) if f.version <= SCHEMA_VERSION => f,
                 _ => {
                     let backup = backup_path(&path);
-                    tracing::warn!(
-                        "accounts file is unreadable; moving it to {}",
-                        backup.display()
-                    );
+                    tracing::warn!("accounts file is unreadable; moving it to {}", backup.display());
                     std::fs::rename(&path, &backup)?;
                     AccountsFile::default()
                 }
@@ -184,23 +164,13 @@ impl AccountManager {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => AccountsFile::default(),
             Err(e) => return Err(e.into()),
         };
-        let mut mgr = Self {
-            path,
-            store,
-            file,
-            token_url: None,
-            revoke_url: None,
-        };
+        let mut mgr = Self { path, store, file, token_url: None, revoke_url: None };
         mgr.fix_active();
         Ok(mgr)
     }
 
     /// Overrides the token and revoke endpoints used for refresh and unlink (mock servers in tests).
-    pub fn with_oauth_endpoints(
-        mut self,
-        token_url: impl Into<String>,
-        revoke_url: impl Into<String>,
-    ) -> Self {
+    pub fn with_oauth_endpoints(mut self, token_url: impl Into<String>, revoke_url: impl Into<String>) -> Self {
         self.token_url = Some(token_url.into());
         self.revoke_url = Some(revoke_url.into());
         self
@@ -227,25 +197,17 @@ impl AccountManager {
 
     /// Validates the token against Discord, then stores it. Only bot users are accepted, so a personal
     /// account token pasted by mistake is refused. Re-adding a known bot replaces its token.
-    pub async fn add_bot_account(
-        &mut self,
-        token: &str,
-        api_base: &str,
-    ) -> Result<AccountRecord, AuthError> {
+    pub async fn add_bot_account(&mut self, token: &str, api_base: &str) -> Result<AccountRecord, AuthError> {
         let token = normalize_bot_token(token)?;
         let auth = format!("Bot {token}");
         let client = http::client()?;
 
-        let user: User = http::get_json(&client, &http::join(api_base, "users/@me"), &auth)
-            .await
-            .map_err(bot_validation_error)?;
+        let user: User = http::get_json(&client, &http::join(api_base, "users/@me"), &auth).await.map_err(bot_validation_error)?;
         if !user.bot {
             return Err(AuthError::NotABot);
         }
         let app: ApplicationInfo =
-            http::get_json(&client, &http::join(api_base, "applications/@me"), &auth)
-                .await
-                .map_err(bot_validation_error)?;
+            http::get_json(&client, &http::join(api_base, "applications/@me"), &auth).await.map_err(bot_validation_error)?;
 
         let now = now_unix();
         let summary = UserSummary::from(&user);
@@ -265,11 +227,7 @@ impl AccountManager {
         if is_new {
             self.file.accounts.push(AccountRecord {
                 id: id.clone(),
-                label: if user.username.is_empty() {
-                    "Bot".into()
-                } else {
-                    user.username.clone()
-                },
+                label: if user.username.is_empty() { "Bot".into() } else { user.username.clone() },
                 bot_user: summary,
                 application_id: Some(app.id),
                 oauth: None,
@@ -292,9 +250,7 @@ impl AccountManager {
             }
             return Err(e);
         }
-        self.account(&id)
-            .cloned()
-            .ok_or(AuthError::AccountNotFound(id))
+        self.account(&id).cloned().ok_or(AuthError::AccountNotFound(id))
     }
 
     pub fn bot_token(&self, account_id: &str) -> Result<Option<String>, AuthError> {
@@ -302,40 +258,21 @@ impl AccountManager {
     }
 
     /// Stores the OAuth tokens (and optional client secret) of a completed sign-in for this account.
-    pub fn link_oauth(
-        &mut self,
-        account_id: &str,
-        cfg: &OAuthConfig,
-        tokens: &OAuthTokens,
-        user: &User,
-    ) -> Result<(), AuthError> {
+    pub fn link_oauth(&mut self, account_id: &str, cfg: &OAuthConfig, tokens: &OAuthTokens, user: &User) -> Result<(), AuthError> {
         self.account_mut(account_id)?;
-        let secret = cfg
-            .client_secret
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty());
+        let secret = cfg.client_secret.as_deref().map(str::trim).filter(|s| !s.is_empty());
 
-        self.store
-            .set(&oauth_key(account_id), &serde_json::to_string(tokens)?)?;
+        self.store.set(&oauth_key(account_id), &serde_json::to_string(tokens)?)?;
         match secret {
             Some(s) => self.store.set(&oauth_secret_key(account_id), s)?,
             None => self.store.delete(&oauth_secret_key(account_id))?,
         }
 
-        let granted: Vec<String> = tokens
-            .scope
-            .split_whitespace()
-            .map(str::to_string)
-            .collect();
+        let granted: Vec<String> = tokens.scope.split_whitespace().map(str::to_string).collect();
         self.account_mut(account_id)?.oauth = Some(OAuthLink {
             client_id: cfg.client_id.trim().to_string(),
             user: UserSummary::from(user),
-            scopes: if granted.is_empty() {
-                cfg.scopes.clone()
-            } else {
-                granted
-            },
+            scopes: if granted.is_empty() { cfg.scopes.clone() } else { granted },
             redirect_port: cfg.redirect_port,
             has_secret: secret.is_some(),
             expired: false,
@@ -345,10 +282,7 @@ impl AccountManager {
 
     /// Returns tokens that are valid for at least the next few minutes, refreshing and persisting them if needed.
     /// A rejected refresh token marks the link expired and yields [`AuthError::SessionExpired`].
-    pub async fn oauth_tokens(
-        &mut self,
-        account_id: &str,
-    ) -> Result<Option<OAuthTokens>, AuthError> {
+    pub async fn oauth_tokens(&mut self, account_id: &str) -> Result<Option<OAuthTokens>, AuthError> {
         let Some(link) = self.account_mut(account_id)?.oauth.clone() else {
             return Ok(None);
         };
@@ -374,14 +308,9 @@ impl AccountManager {
         let cfg = self.link_config(account_id, &link)?;
         match oauth::refresh(&cfg, &refresh_token).await {
             Ok(new_tokens) => {
-                self.store
-                    .set(&oauth_key(account_id), &serde_json::to_string(&new_tokens)?)?;
+                self.store.set(&oauth_key(account_id), &serde_json::to_string(&new_tokens)?)?;
                 if !new_tokens.scope.is_empty() {
-                    let scopes = new_tokens
-                        .scope
-                        .split_whitespace()
-                        .map(str::to_string)
-                        .collect();
+                    let scopes = new_tokens.scope.split_whitespace().map(str::to_string).collect();
                     if let Some(l) = self.account_mut(account_id)?.oauth.as_mut() {
                         l.scopes = scopes;
                     }
@@ -424,11 +353,7 @@ impl AccountManager {
         self.save()
     }
 
-    pub fn mark_credentials_invalid(
-        &mut self,
-        account_id: &str,
-        invalid: bool,
-    ) -> Result<(), AuthError> {
+    pub fn mark_credentials_invalid(&mut self, account_id: &str, invalid: bool) -> Result<(), AuthError> {
         self.account_mut(account_id)?.credentials_invalid = invalid;
         self.save()
     }
@@ -436,20 +361,14 @@ impl AccountManager {
     pub fn update_label(&mut self, account_id: &str, label: &str) -> Result<(), AuthError> {
         let label: String = label.trim().chars().take(MAX_LABEL_CHARS).collect();
         if label.is_empty() {
-            return Err(AuthError::InvalidConfig(
-                "The account name cannot be empty.".into(),
-            ));
+            return Err(AuthError::InvalidConfig("The account name cannot be empty.".into()));
         }
         self.account_mut(account_id)?.label = label;
         self.save()
     }
 
     fn account_mut(&mut self, id: &str) -> Result<&mut AccountRecord, AuthError> {
-        self.file
-            .accounts
-            .iter_mut()
-            .find(|a| a.id == id)
-            .ok_or_else(|| AuthError::AccountNotFound(id.to_string()))
+        self.file.accounts.iter_mut().find(|a| a.id == id).ok_or_else(|| AuthError::AccountNotFound(id.to_string()))
     }
 
     fn set_link_expired(&mut self, account_id: &str) -> Result<(), AuthError> {
@@ -461,18 +380,9 @@ impl AccountManager {
 
     /// Keeps `active` pointing at a real account, preferring the most recently used one.
     fn fix_active(&mut self) {
-        let valid = self
-            .file
-            .active
-            .as_deref()
-            .is_some_and(|id| self.account(id).is_some());
+        let valid = self.file.active.as_deref().is_some_and(|id| self.account(id).is_some());
         if !valid {
-            self.file.active = self
-                .file
-                .accounts
-                .iter()
-                .max_by_key(|a| a.last_used_at)
-                .map(|a| a.id.clone());
+            self.file.active = self.file.accounts.iter().max_by_key(|a| a.last_used_at).map(|a| a.id.clone());
         }
     }
 
@@ -496,20 +406,12 @@ impl AccountManager {
     }
 
     async fn revoke_best_effort(&self, account_id: &str, link: &OAuthLink) {
-        let tokens = self
-            .store
-            .get(&oauth_key(account_id))
-            .ok()
-            .flatten()
-            .and_then(|json| serde_json::from_str::<OAuthTokens>(&json).ok());
+        let tokens = self.store.get(&oauth_key(account_id)).ok().flatten().and_then(|json| serde_json::from_str::<OAuthTokens>(&json).ok());
         let Some(tokens) = tokens else { return };
         let Ok(cfg) = self.link_config(account_id, link) else {
             return;
         };
-        let token = tokens
-            .refresh_token
-            .as_deref()
-            .unwrap_or(&tokens.access_token);
+        let token = tokens.refresh_token.as_deref().unwrap_or(&tokens.access_token);
         if let Err(e) = oauth::revoke(&cfg, token).await {
             tracing::warn!("could not revoke the OAuth grant at Discord: {e}");
         }
@@ -520,11 +422,7 @@ impl AccountManager {
         if let Some(dir) = self.path.parent().filter(|d| !d.as_os_str().is_empty()) {
             std::fs::create_dir_all(dir)?;
         }
-        let mut tmp_name = self
-            .path
-            .file_name()
-            .map(|n| n.to_os_string())
-            .unwrap_or_default();
+        let mut tmp_name = self.path.file_name().map(|n| n.to_os_string()).unwrap_or_default();
         tmp_name.push(".tmp");
         let tmp = self.path.with_file_name(tmp_name);
 
@@ -561,37 +459,20 @@ mod tests {
 
     #[test]
     fn token_normalization() {
-        assert_eq!(
-            normalize_bot_token("  abc.def.ghi \n").unwrap(),
-            "abc.def.ghi"
-        );
-        assert_eq!(
-            normalize_bot_token("Bot abc.def.ghi").unwrap(),
-            "abc.def.ghi"
-        );
+        assert_eq!(normalize_bot_token("  abc.def.ghi \n").unwrap(), "abc.def.ghi");
+        assert_eq!(normalize_bot_token("Bot abc.def.ghi").unwrap(), "abc.def.ghi");
         assert_eq!(normalize_bot_token("bot   abc.def").unwrap(), "abc.def");
         assert_eq!(normalize_bot_token(""), Err(AuthError::InvalidToken));
         assert_eq!(normalize_bot_token("Bot "), Err(AuthError::InvalidToken));
-        assert_eq!(
-            normalize_bot_token("ñ-é-ü token"),
-            Err(AuthError::InvalidToken)
-        );
+        assert_eq!(normalize_bot_token("ñ-é-ü token"), Err(AuthError::InvalidToken));
         assert_eq!(normalize_bot_token("abc def"), Err(AuthError::InvalidToken));
-        assert_eq!(
-            normalize_bot_token("abc\r\nX-Evil: 1"),
-            Err(AuthError::InvalidToken)
-        );
+        assert_eq!(normalize_bot_token("abc\r\nX-Evil: 1"), Err(AuthError::InvalidToken));
     }
 
     #[test]
     fn invite_url_shapes() {
         let url = bot_invite_url(Id(123), RECOMMENDED_BOT_PERMISSIONS, None);
-        assert_eq!(
-            url,
-            format!(
-                "https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions={RECOMMENDED_BOT_PERMISSIONS}"
-            )
-        );
+        assert_eq!(url, format!("https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions={RECOMMENDED_BOT_PERMISSIONS}"));
         let url = bot_invite_url(Id(123), 8, Some(Id(456)));
         assert!(url.ends_with("&permissions=8&guild_id=456&disable_guild_select=true"));
     }

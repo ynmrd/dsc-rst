@@ -153,13 +153,7 @@ fn roles_of<'a>(roles: &'a [Role], ids: &'a [Id]) -> impl Iterator<Item = &'a Ro
 }
 
 /// Apply channel permission overwrites on top of base permissions.
-pub fn apply_overwrites(
-    base: Permissions,
-    guild_id: Id,
-    member_user_id: Id,
-    member_roles: &[Id],
-    overwrites: &[Overwrite],
-) -> Permissions {
+pub fn apply_overwrites(base: Permissions, guild_id: Id, member_user_id: Id, member_roles: &[Id], overwrites: &[Overwrite]) -> Permissions {
     if base.contains(Permissions::ADMINISTRATOR) || base == Permissions::ALL {
         return Permissions::ALL;
     }
@@ -168,10 +162,7 @@ pub fn apply_overwrites(
         perms = Permissions((perms.0 & !ow.deny.0) | ow.allow.0);
     }
     let (mut allow, mut deny) = (0u64, 0u64);
-    for ow in overwrites
-        .iter()
-        .filter(|o| o.kind == OverwriteKind::Role && o.id != guild_id && member_roles.contains(&o.id))
-    {
+    for ow in overwrites.iter().filter(|o| o.kind == OverwriteKind::Role && o.id != guild_id && member_roles.contains(&o.id)) {
         allow |= ow.allow.0;
         deny |= ow.deny.0;
     }

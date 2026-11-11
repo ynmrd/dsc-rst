@@ -156,11 +156,8 @@ mod tests {
 
     #[test]
     fn reaction_remove_emoji_has_emoji() {
-        let d = Dispatch::parse(
-            "MESSAGE_REACTION_REMOVE_EMOJI",
-            r#"{"channel_id":"1","message_id":"2","emoji":{"id":null,"name":"🔥"}}"#,
-        )
-        .unwrap();
+        let d = Dispatch::parse("MESSAGE_REACTION_REMOVE_EMOJI", r#"{"channel_id":"1","message_id":"2","emoji":{"id":null,"name":"🔥"}}"#)
+            .unwrap();
         let Dispatch::MessageReactionRemoveEmoji(r) = d else { panic!() };
         assert_eq!(r.emoji.unwrap().name.as_deref(), Some("🔥"));
     }

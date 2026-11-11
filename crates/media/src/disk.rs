@@ -37,11 +37,8 @@ fn strip_signature(url: &mut Url) {
     if !SIGNATURE.iter().all(|name| has(url, name)) {
         return;
     }
-    let kept: Vec<(String, String)> = url
-        .query_pairs()
-        .filter(|(k, _)| !SIGNATURE.contains(&k.as_ref()))
-        .map(|(k, v)| (k.into_owned(), v.into_owned()))
-        .collect();
+    let kept: Vec<(String, String)> =
+        url.query_pairs().filter(|(k, _)| !SIGNATURE.contains(&k.as_ref())).map(|(k, v)| (k.into_owned(), v.into_owned())).collect();
     if kept.is_empty() {
         url.set_query(None);
     } else {

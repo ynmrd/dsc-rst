@@ -7,11 +7,7 @@ use crate::util::is_lang;
 const MAX_LIST_DEPTH: usize = 16;
 
 pub fn parse(src: &str) -> Vec<Block> {
-    if src.contains('\r') {
-        parse_blocks(&src.replace("\r\n", "\n").replace('\r', "\n"), false)
-    } else {
-        parse_blocks(src, false)
-    }
+    if src.contains('\r') { parse_blocks(&src.replace("\r\n", "\n").replace('\r', "\n"), false) } else { parse_blocks(src, false) }
 }
 
 /// `in_quote` disables nested quotes, as Discord does.
@@ -77,10 +73,7 @@ fn flush_para(out: &mut Vec<Block>, src: &str, start: Option<usize>, end: usize)
 
 fn split_indent(line: &str) -> (usize, &str) {
     let body = line.trim_start_matches([' ', '\t']);
-    let cols = line[..line.len() - body.len()]
-        .bytes()
-        .map(|c| if c == b'\t' { 4 } else { 1 })
-        .sum();
+    let cols = line[..line.len() - body.len()].bytes().map(|c| if c == b'\t' { 4 } else { 1 }).sum();
     (cols, body)
 }
 
@@ -89,13 +82,7 @@ fn line_end(src: &str, pos: usize) -> usize {
 }
 
 /// Tries to start a line-level block at `pos`; returns the position after it.
-fn block_at(
-    src: &str,
-    pos: usize,
-    end: usize,
-    in_quote: bool,
-    out: &mut Vec<Block>,
-) -> Option<usize> {
+fn block_at(src: &str, pos: usize, end: usize, in_quote: bool, out: &mut Vec<Block>) -> Option<usize> {
     let line = &src[pos..end];
     let (_, body) = split_indent(line);
     let first = *body.as_bytes().first()?;
@@ -119,10 +106,7 @@ fn block_at(
             if !(1..=3).contains(&hashes) || content.is_empty() {
                 return None;
             }
-            out.push(Block::Heading {
-                level: hashes as u8,
-                content: parse_inline(content),
-            });
+            out.push(Block::Heading { level: hashes as u8, content: parse_inline(content) });
             Some(end + 1)
         }
         b'-' | b'*' | b'0'..=b'9' => {
@@ -198,12 +182,7 @@ fn list_lines(src: &str, pos: usize, out: &mut Vec<Block>) -> usize {
         let Some((ordered, num, text)) = list_marker(body) else {
             break;
         };
-        items.push(Item {
-            indent,
-            ordered,
-            num,
-            text,
-        });
+        items.push(Item { indent, ordered, num, text });
         p = e + 1;
     }
     let mut i = 0;
@@ -237,20 +216,11 @@ fn build_list(items: &[Item], pos: &mut usize, indent: usize, depth: usize) -> B
         out.push(vec![Block::Paragraph(parse_inline(it.text))]);
         *pos += 1;
     }
-    Block::List {
-        ordered,
-        start,
-        items: out,
-    }
+    Block::List { ordered, start, items: out }
 }
 
 /// Finds a terminated ``` fence opening on this line; returns (offset in line, block, resume position).
-fn fence_in_line(
-    src: &str,
-    pos: usize,
-    end: usize,
-    last_fence: Option<usize>,
-) -> Option<(usize, Block, usize)> {
+fn fence_in_line(src: &str, pos: usize, end: usize, last_fence: Option<usize>) -> Option<(usize, Block, usize)> {
     let mut from = pos;
     while let Some(k) = src[from..end].find("```") {
         let p = from + k;
@@ -275,8 +245,5 @@ fn code_block(inner: &str) -> Option<Block> {
     if lang.is_none() && code.trim().is_empty() {
         return None;
     }
-    Some(Block::CodeBlock {
-        lang,
-        code: code.to_string(),
-    })
+    Some(Block::CodeBlock { lang, code: code.to_string() })
 }

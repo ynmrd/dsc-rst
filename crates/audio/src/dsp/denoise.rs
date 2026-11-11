@@ -15,12 +15,7 @@ impl NoiseSuppressor {
     const SCALE: f32 = 32768.0;
 
     pub fn new() -> Self {
-        Self {
-            state: DenoiseState::new(),
-            input: [0.0; Self::FRAME],
-            output: [0.0; Self::FRAME],
-            vad_probability: 0.0,
-        }
+        Self { state: DenoiseState::new(), input: [0.0; Self::FRAME], output: [0.0; Self::FRAME], vad_probability: 0.0 }
     }
 
     /// Denoises `samples` in place, one [`Self::FRAME`] chunk at a time; a trailing partial chunk

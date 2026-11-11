@@ -79,13 +79,7 @@ struct ErrorBody {
 /// Extracts `(code, message)` from a Discord error body, appending field errors
 /// such as `content: Must be 2000 or fewer in length.`.
 pub(crate) fn describe_error(status: u16, body: &[u8]) -> (Option<u64>, String) {
-    let fallback = || {
-        reqwest::StatusCode::from_u16(status)
-            .ok()
-            .and_then(|s| s.canonical_reason())
-            .unwrap_or("request failed")
-            .to_string()
-    };
+    let fallback = || reqwest::StatusCode::from_u16(status).ok().and_then(|s| s.canonical_reason()).unwrap_or("request failed").to_string();
     let Ok(parsed) = serde_json::from_slice::<ErrorBody>(body) else {
         return (None, fallback());
     };

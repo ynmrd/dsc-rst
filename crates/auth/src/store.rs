@@ -22,9 +22,7 @@ pub struct KeyringStore {
 
 impl KeyringStore {
     pub fn new(service: &str) -> Self {
-        Self {
-            service: service.to_string(),
-        }
+        Self { service: service.to_string() }
     }
 
     fn entry(&self, key: &str) -> Result<keyring::Entry, AuthError> {
@@ -34,9 +32,7 @@ impl KeyringStore {
 
 impl fmt::Debug for KeyringStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("KeyringStore")
-            .field("service", &self.service)
-            .finish()
+        f.debug_struct("KeyringStore").field("service", &self.service).finish()
     }
 }
 
@@ -80,9 +76,7 @@ impl MemoryStore {
 
 impl fmt::Debug for MemoryStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MemoryStore")
-            .field("entries", &self.0.lock().len())
-            .finish()
+        f.debug_struct("MemoryStore").field("entries", &self.0.lock().len()).finish()
     }
 }
 

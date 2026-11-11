@@ -105,10 +105,7 @@ fn random_chars(rng: &mut Rng) -> String {
             0 => char::from_u32(rng.below(0x80) as u32).unwrap_or('?'),
             1 => char::from_u32(0x80 + rng.below(0x800) as u32).unwrap_or('?'),
             2 => char::from_u32(0x1F300 + rng.below(0x400) as u32).unwrap_or('?'),
-            _ => [
-                '*', '_', '~', '|', '`', '<', '>', '[', ']', '(', ')', '\\', '\n', ' ', '@', '#',
-                ':',
-            ][rng.below(17)],
+            _ => ['*', '_', '~', '|', '`', '<', '>', '[', ']', '(', ')', '\\', '\n', ' ', '@', '#', ':'][rng.below(17)],
         })
         .collect()
 }
@@ -117,11 +114,7 @@ fn inline_depth(inlines: &[Inline]) -> usize {
     inlines
         .iter()
         .map(|i| match i {
-            Inline::Bold(c)
-            | Inline::Italic(c)
-            | Inline::Underline(c)
-            | Inline::Strike(c)
-            | Inline::Spoiler(c) => 1 + inline_depth(c),
+            Inline::Bold(c) | Inline::Italic(c) | Inline::Underline(c) | Inline::Strike(c) | Inline::Spoiler(c) => 1 + inline_depth(c),
             Inline::Link { text, .. } => 1 + inline_depth(text),
             _ => 0,
         })
@@ -133,13 +126,9 @@ fn block_depth(blocks: &[Block]) -> usize {
     blocks
         .iter()
         .map(|b| match b {
-            Block::Paragraph(i) | Block::Subtext(i) | Block::Heading { content: i, .. } => {
-                inline_depth(i)
-            }
+            Block::Paragraph(i) | Block::Subtext(i) | Block::Heading { content: i, .. } => inline_depth(i),
             Block::Quote(c) => 1 + block_depth(c),
-            Block::List { items, .. } => {
-                1 + items.iter().map(|it| block_depth(it)).max().unwrap_or(0)
-            }
+            Block::List { items, .. } => 1 + items.iter().map(|it| block_depth(it)).max().unwrap_or(0),
             Block::CodeBlock { .. } => 0,
         })
         .max()
@@ -148,10 +137,7 @@ fn block_depth(blocks: &[Block]) -> usize {
 
 fn exercise(src: &str, rng: &mut Rng) {
     let blocks = markdown::parse(src);
-    assert!(
-        block_depth(&blocks) <= MAX_DEPTH + 20,
-        "nesting escaped its cap for {src:?}"
-    );
+    assert!(block_depth(&blocks) <= MAX_DEPTH + 20, "nesting escaped its cap for {src:?}");
     let _ = markdown::to_plain_text(&blocks, &|_| None);
     let _ = markdown::parse_inline(src);
     let _ = emoji::replace_shortcodes(src);
@@ -160,10 +146,7 @@ fn exercise(src: &str, rng: &mut Rng) {
     let limit = [4, 7, 24, 40, 100, 2000][rng.below(6)];
     let chunks = compose::split_message(src, limit);
     for c in &chunks {
-        assert!(
-            c.encode_utf16().count() <= limit,
-            "chunk over {limit} for {src:?}: {c:?}"
-        );
+        assert!(c.encode_utf16().count() <= limit, "chunk over {limit} for {src:?}: {c:?}");
     }
 
     for cursor in 0..=src.len() + 2 {
@@ -209,11 +192,7 @@ fn fuzz_timestamps_never_panic() {
 
 fn time_limit() -> Duration {
     // Workspace crates build unoptimised under `cargo test`; the 50 ms target applies to release.
-    if cfg!(debug_assertions) {
-        Duration::from_millis(1500)
-    } else {
-        Duration::from_millis(50)
-    }
+    if cfg!(debug_assertions) { Duration::from_millis(1500) } else { Duration::from_millis(50) }
 }
 
 fn timed(name: &str, src: &str) {
@@ -241,10 +220,7 @@ fn adversarial_inputs_stay_linear() {
     let cases: Vec<(&str, String)> = vec![
         ("stars open", "*a ".repeat(n / 3)),
         ("stars close", "a* ".repeat(n / 3)),
-        (
-            "nested bold",
-            format!("{}x{}", "**".repeat(n / 4), "**".repeat(n / 4)),
-        ),
+        ("nested bold", format!("{}x{}", "**".repeat(n / 4), "**".repeat(n / 4))),
         ("mixed delimiters", "*_~~||".repeat(n / 6)),
         ("alternating delimiters", "*a_b~~c||d".repeat(n / 10)),
         ("underscores", "_a".repeat(n / 2)),
@@ -261,10 +237,7 @@ fn adversarial_inputs_stay_linear() {
         ("angle links", "<https://x".repeat(n / 10)),
         ("mentions", "<@1".repeat(n / 3)),
         ("autolinks", "https://a.b/".repeat(n / 12)),
-        (
-            "autolink punctuation",
-            format!("https://a.b{}", ")".repeat(n)),
-        ),
+        ("autolink punctuation", format!("https://a.b{}", ")".repeat(n))),
         ("autolink stars", format!("https://{}", "*".repeat(n))),
         ("autolinks spaced", "http://* ".repeat(n / 9)),
         ("quotes", "> ".repeat(n / 2)),
@@ -272,18 +245,8 @@ fn adversarial_inputs_stay_linear() {
         ("quote all", ">>> a\n".repeat(n / 6)),
         ("headings", "# a\n".repeat(n / 4)),
         ("list lines", "- a\n".repeat(n / 4)),
-        (
-            "deep lists",
-            (0..400)
-                .map(|i| format!("{}- x\n", " ".repeat(i)))
-                .collect(),
-        ),
-        (
-            "list dedent",
-            (0..300)
-                .map(|i| format!("{}- x\n", " ".repeat(300 - i)))
-                .collect(),
-        ),
+        ("deep lists", (0..400).map(|i| format!("{}- x\n", " ".repeat(i))).collect()),
+        ("list dedent", (0..300).map(|i| format!("{}- x\n", " ".repeat(300 - i))).collect()),
         ("escapes", "\\*".repeat(n / 2)),
         ("backslashes", "\\".repeat(n)),
         ("newlines", "\n".repeat(n)),
@@ -296,10 +259,6 @@ fn adversarial_inputs_stay_linear() {
         let _ = emoji::replace_shortcodes(src);
         let _ = emoji::is_emoji_only(src, 10);
         let _ = compose::split_message(src, 2000);
-        assert!(
-            start.elapsed() < time_limit() * 4,
-            "helpers on {name} took {:?}",
-            start.elapsed()
-        );
+        assert!(start.elapsed() < time_limit() * 4, "helpers on {name} took {:?}", start.elapsed());
     }
 }

@@ -15,7 +15,11 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store) {
     let shown: usize = groups.iter().map(|g| g.members.len()).sum();
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         if groups.is_empty() {
-            ui.label(RichText::new("Member list unavailable. Enable the Server Members intent for this bot in the Developer Portal.").color(p.muted).size(12.5));
+            ui.label(
+                RichText::new("Member list unavailable. Enable the Server Members intent for this bot in the Developer Portal.")
+                    .color(p.muted)
+                    .size(12.5),
+            );
         }
         for g in groups {
             ui.add_space(12.0);

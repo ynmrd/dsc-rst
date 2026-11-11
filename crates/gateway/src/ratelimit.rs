@@ -21,11 +21,7 @@ impl SendLimiter {
 
     /// Reserves enough slots for the heartbeats of one window at `interval`.
     pub fn reserve_for_heartbeats(&mut self, interval: Duration) {
-        let per_window = if interval.is_zero() {
-            u64::MAX
-        } else {
-            self.window.as_millis().div_ceil(interval.as_millis().max(1)) as u64
-        };
+        let per_window = if interval.is_zero() { u64::MAX } else { self.window.as_millis().div_ceil(interval.as_millis().max(1)) as u64 };
         let reserve = (per_window.saturating_add(1)).min(self.limit as u64 / 2) as usize;
         self.capacity = self.limit - reserve.max(1);
     }

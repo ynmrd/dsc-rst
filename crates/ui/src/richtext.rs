@@ -287,11 +287,7 @@ fn render_block(ui: &mut Ui, block: &Block, rc: &mut RenderCtx, spoiler_base: &m
                 })
             });
             let r = resp.response.rect;
-            ui.painter().rect_filled(
-                Rect::from_min_size(r.min, vec2(4.0, r.height())),
-                CornerRadius::same(2),
-                p.faint,
-            );
+            ui.painter().rect_filled(Rect::from_min_size(r.min, vec2(4.0, r.height())), CornerRadius::same(2), p.faint);
         }
         Block::List { ordered, start, items } => {
             for (i, item) in items.iter().enumerate() {
@@ -382,20 +378,22 @@ fn show_job(ui: &mut Ui, job: LayoutJob, spans: Vec<Span>, rc: &mut RenderCtx) {
         }
     }
     if resp.clicked()
-        && let Some(ci) = resp.interact_pointer_pos().map(|p| galley.cursor_from_pos(p - pos).index.0) {
-            // Spoilers first: clicking hidden text reveals it instead of following links.
-            if let Some(Span { kind: SpanKind::Spoiler(id), .. }) =
-                spans.iter().find(|s| s.chars.contains(&ci) && matches!(s.kind, SpanKind::Spoiler(_)))
-                && rc.revealed.insert((rc.key, *id)) {
-                    return;
-                }
-            for s in spans.iter().filter(|s| s.chars.contains(&ci)) {
-                match &s.kind {
-                    SpanKind::Link { url, masked } => rc.actions.push(RichAction::OpenUrl { url: url.clone(), masked: *masked }),
-                    SpanKind::User(id) => rc.actions.push(RichAction::Profile(*id)),
-                    SpanKind::Channel(id) => rc.actions.push(RichAction::Channel(*id)),
-                    _ => {}
-                }
+        && let Some(ci) = resp.interact_pointer_pos().map(|p| galley.cursor_from_pos(p - pos).index.0)
+    {
+        // Spoilers first: clicking hidden text reveals it instead of following links.
+        if let Some(Span { kind: SpanKind::Spoiler(id), .. }) =
+            spans.iter().find(|s| s.chars.contains(&ci) && matches!(s.kind, SpanKind::Spoiler(_)))
+            && rc.revealed.insert((rc.key, *id))
+        {
+            return;
+        }
+        for s in spans.iter().filter(|s| s.chars.contains(&ci)) {
+            match &s.kind {
+                SpanKind::Link { url, masked } => rc.actions.push(RichAction::OpenUrl { url: url.clone(), masked: *masked }),
+                SpanKind::User(id) => rc.actions.push(RichAction::Profile(*id)),
+                SpanKind::Channel(id) => rc.actions.push(RichAction::Channel(*id)),
+                _ => {}
             }
         }
+    }
 }

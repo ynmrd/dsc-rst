@@ -43,11 +43,7 @@ pub fn downmix_to_mono(interleaved: &[f32], channels: usize, out: &mut Vec<f32>)
         1 => out.extend_from_slice(interleaved),
         n => {
             let scale = 1.0 / n as f32;
-            out.extend(
-                interleaved
-                    .chunks_exact(n)
-                    .map(|frame| frame.iter().sum::<f32>() * scale),
-            );
+            out.extend(interleaved.chunks_exact(n).map(|frame| frame.iter().sum::<f32>() * scale));
         }
     }
 }
@@ -97,16 +93,12 @@ pub(crate) mod test_signals {
     use std::f32::consts::TAU;
 
     pub fn sine(freq: f32, rate: u32, amplitude: f32, len: usize) -> Vec<f32> {
-        (0..len)
-            .map(|i| amplitude * (TAU * freq * i as f32 / rate as f32).sin())
-            .collect()
+        (0..len).map(|i| amplitude * (TAU * freq * i as f32 / rate as f32).sin()).collect()
     }
 
     /// Deterministic uniform white noise in [-amplitude, amplitude].
     pub fn noise(amplitude: f32, len: usize, seed: u64) -> Vec<f32> {
-        let mut state = seed
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
+        let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         (0..len)
             .map(|_| {
                 state ^= state << 13;
@@ -119,10 +111,7 @@ pub(crate) mod test_signals {
     }
 
     pub fn zero_crossings(samples: &[f32]) -> usize {
-        samples
-            .windows(2)
-            .filter(|w| (w[0] < 0.0) != (w[1] < 0.0))
-            .count()
+        samples.windows(2).filter(|w| (w[0] < 0.0) != (w[1] < 0.0)).count()
     }
 }
 
@@ -165,10 +154,7 @@ mod tests {
         upmix_stereo_to(&[1.0, 0.0], 2, &mut out);
         assert_eq!(out, vec![1.0, 0.0]);
         upmix_stereo_to(&[1.0, -1.0, 0.5, 0.25], 6, &mut out);
-        assert_eq!(
-            out,
-            vec![1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.25, 0.0, 0.0, 0.0, 0.0]
-        );
+        assert_eq!(out, vec![1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.25, 0.0, 0.0, 0.0, 0.0]);
     }
 
     #[test]

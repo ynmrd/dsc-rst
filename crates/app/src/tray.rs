@@ -17,7 +17,13 @@ pub fn create(ctx: &egui::Context, tx: crossbeam_channel::Sender<ShellEvent>) ->
     menu.append(&PredefinedMenuItem::separator()).ok()?;
     menu.append(&quit).ok()?;
     let icon = Icon::from_rgba(ICON_RGBA.to_vec(), 64, 64).ok()?;
-    let tray = match TrayIconBuilder::new().with_menu(Box::new(menu)).with_tooltip("Discord Native").with_icon(icon).with_menu_on_left_click(false).build() {
+    let tray = match TrayIconBuilder::new()
+        .with_menu(Box::new(menu))
+        .with_tooltip("Discord Native")
+        .with_icon(icon)
+        .with_menu_on_left_click(false)
+        .build()
+    {
         Ok(t) => t,
         Err(e) => {
             tracing::warn!("tray icon unavailable: {e}");

@@ -10,11 +10,72 @@ const CHANNELS: u64 = 40;
 const AUTHORS: u64 = 300;
 
 const WORDS: &[&str] = &[
-    "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog", "voice", "channel", "server", "message", "gateway", "connection",
-    "audio", "microphone", "latency", "rust", "native", "client", "window", "render", "scroll", "memory", "thread", "async", "tokio",
-    "socket", "packet", "opus", "stream", "release", "update", "patch", "build", "deploy", "review", "merge", "branch", "commit",
-    "lunch", "meeting", "tomorrow", "weekend", "game", "match", "ranked", "queue", "lobby", "party", "stream", "emoji", "reaction",
-    "thanks", "please", "sorry", "great", "awesome", "problem", "solution", "question", "answer", "link", "image", "video", "file",
+    "the",
+    "quick",
+    "brown",
+    "fox",
+    "jumps",
+    "over",
+    "lazy",
+    "dog",
+    "voice",
+    "channel",
+    "server",
+    "message",
+    "gateway",
+    "connection",
+    "audio",
+    "microphone",
+    "latency",
+    "rust",
+    "native",
+    "client",
+    "window",
+    "render",
+    "scroll",
+    "memory",
+    "thread",
+    "async",
+    "tokio",
+    "socket",
+    "packet",
+    "opus",
+    "stream",
+    "release",
+    "update",
+    "patch",
+    "build",
+    "deploy",
+    "review",
+    "merge",
+    "branch",
+    "commit",
+    "lunch",
+    "meeting",
+    "tomorrow",
+    "weekend",
+    "game",
+    "match",
+    "ranked",
+    "queue",
+    "lobby",
+    "party",
+    "stream",
+    "emoji",
+    "reaction",
+    "thanks",
+    "please",
+    "sorry",
+    "great",
+    "awesome",
+    "problem",
+    "solution",
+    "question",
+    "answer",
+    "link",
+    "image",
+    "video",
+    "file",
 ];
 
 /// Deterministic pseudo-random chat history.
@@ -116,10 +177,14 @@ fn prune(c: &mut Criterion) {
     let mut group = c.benchmark_group("prune");
     group.sample_size(10);
     group.bench_function("50k_to_25k_total", |b| {
-        b.iter_batched(|| filled(&msgs), |(dir, mut s)| {
-            black_box(s.prune(TOTAL / 2, usize::MAX).unwrap());
-            (dir, s)
-        }, BatchSize::PerIteration);
+        b.iter_batched(
+            || filled(&msgs),
+            |(dir, mut s)| {
+                black_box(s.prune(TOTAL / 2, usize::MAX).unwrap());
+                (dir, s)
+            },
+            BatchSize::PerIteration,
+        );
     });
     group.finish();
 }

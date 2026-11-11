@@ -72,12 +72,8 @@ impl Store {
     pub fn threads_of(&self, parent: Id) -> Vec<&Channel> {
         let Some(gid) = self.guild_of(parent) else { return vec![] };
         let Some(gs) = self.guilds.get(&gid) else { return vec![] };
-        let mut v: Vec<&Channel> = gs
-            .thread_ids
-            .iter()
-            .filter_map(|t| self.channels.get(t))
-            .filter(|t| t.parent_id == Some(parent))
-            .collect();
+        let mut v: Vec<&Channel> =
+            gs.thread_ids.iter().filter_map(|t| self.channels.get(t)).filter(|t| t.parent_id == Some(parent)).collect();
         v.sort_by_key(|t| std::cmp::Reverse(t.last_message_id.max(Some(t.id))));
         v
     }
@@ -104,9 +100,10 @@ impl Store {
                 break;
             }
             if let Some(ow) = &overwrites
-                && !permissions::channel_permissions(&gs.guild, *uid, m, ow).can_view() {
-                    continue;
-                }
+                && !permissions::channel_permissions(&gs.guild, *uid, m, ow).can_view()
+            {
+                continue;
+            }
             let user = self.users.get(uid);
             let status = self.status_of(*uid);
             let presence = self.presences.get(uid);
@@ -121,10 +118,7 @@ impl Store {
             let slot = if status == Status::Offline || status == Status::Invisible {
                 offline_idx
             } else {
-                hoisted
-                    .iter()
-                    .position(|r| m.roles.contains(&r.id))
-                    .unwrap_or(online_idx)
+                hoisted.iter().position(|r| m.roles.contains(&r.id)).unwrap_or(online_idx)
             };
             buckets[slot].push(row);
             count += 1;

@@ -37,10 +37,7 @@ pub fn replace_shortcodes(text: &str) -> String {
             b':' => {
                 let ns = i + 1;
                 let mut j = ns;
-                while j < b.len()
-                    && j - ns <= 40
-                    && (b[j].is_ascii_alphanumeric() || matches!(b[j], b'_' | b'+' | b'-'))
-                {
+                while j < b.len() && j - ns <= 40 && (b[j].is_ascii_alphanumeric() || matches!(b[j], b'_' | b'+' | b'-')) {
                     j += 1;
                 }
                 if j > ns
@@ -77,16 +74,9 @@ pub fn search(query: &str, limit: usize) -> Vec<(&'static str, &'static str)> {
     if limit == 0 {
         return Vec::new();
     }
-    let q = query
-        .trim()
-        .trim_matches(':')
-        .to_lowercase()
-        .replace(' ', "_");
+    let q = query.trim().trim_matches(':').to_lowercase().replace(' ', "_");
     if q.is_empty() {
-        return emojis::iter()
-            .filter_map(|e| e.shortcode().map(|s| (e.as_str(), s)))
-            .take(limit)
-            .collect();
+        return emojis::iter().filter_map(|e| e.shortcode().map(|s| (e.as_str(), s))).take(limit).collect();
     }
     let mut hits: Vec<(u8, usize, &'static str, &'static str)> = Vec::new();
     for e in emojis::iter() {
@@ -110,10 +100,7 @@ pub fn search(query: &str, limit: usize) -> Vec<(&'static str, &'static str)> {
         }
     }
     hits.sort_unstable();
-    hits.into_iter()
-        .take(limit)
-        .map(|(_, _, s, e)| (e, s))
-        .collect()
+    hits.into_iter().take(limit).map(|(_, _, s, e)| (e, s)).collect()
 }
 
 fn group_name(g: Group) -> &'static str {
@@ -134,11 +121,7 @@ fn group_name(g: Group) -> &'static str {
 pub fn categories() -> Vec<(&'static str, Vec<&'static str>)> {
     Group::iter()
         .map(|g| {
-            let list = g
-                .emojis()
-                .filter(|e| e.skin_tone().is_none_or(|t| t == emojis::SkinTone::Default))
-                .map(|e| e.as_str())
-                .collect();
+            let list = g.emojis().filter(|e| e.skin_tone().is_none_or(|t| t == emojis::SkinTone::Default)).map(|e| e.as_str()).collect();
             (group_name(g), list)
         })
         .collect()
@@ -187,10 +170,7 @@ fn unicode_emoji_len(s: &str) -> Option<usize> {
     let mut end = first.len_utf8();
     let mut single = true;
     if is_regional_indicator(first)
-        && let Some(n) = s[end..]
-            .chars()
-            .next()
-            .filter(|&n| is_regional_indicator(n))
+        && let Some(n) = s[end..].chars().next().filter(|&n| is_regional_indicator(n))
     {
         end += n.len_utf8();
         single = false;
@@ -212,10 +192,7 @@ fn unicode_emoji_len(s: &str) -> Option<usize> {
         }
     }
     // Text-style symbols (©, ™, digits, ‼ …) only count with an explicit emoji modifier.
-    if single
-        && (first.is_ascii()
-            || matches!(first, '\u{80}'..='\u{FF}' | '\u{2000}'..='\u{2122}' | '\u{2139}'))
-    {
+    if single && (first.is_ascii() || matches!(first, '\u{80}'..='\u{FF}' | '\u{2000}'..='\u{2122}' | '\u{2139}')) {
         return None;
     }
     emojis::get(&s[..end]).map(|_| end)
@@ -235,10 +212,7 @@ mod tests {
 
     #[test]
     fn unknown_codes_and_colons_stay() {
-        assert_eq!(
-            replace_shortcodes(":definitelynotanemoji: x"),
-            ":definitelynotanemoji: x"
-        );
+        assert_eq!(replace_shortcodes(":definitelynotanemoji: x"), ":definitelynotanemoji: x");
         assert_eq!(replace_shortcodes("time 10:30:45 ok"), "time 10:30:45 ok");
         assert_eq!(replace_shortcodes("::smile::"), ":😄:");
         assert_eq!(replace_shortcodes(":smile"), ":smile");
@@ -248,26 +222,14 @@ mod tests {
     #[test]
     fn code_is_left_untouched() {
         assert_eq!(replace_shortcodes("`:smile:` :smile:"), "`:smile:` 😄");
-        assert_eq!(
-            replace_shortcodes("``a :smile: b`` :smile:"),
-            "``a :smile: b`` 😄"
-        );
-        assert_eq!(
-            replace_shortcodes("```\n:smile:\n```\n:smile:"),
-            "```\n:smile:\n```\n😄"
-        );
-        assert_eq!(
-            replace_shortcodes("unterminated ` :smile:"),
-            "unterminated ` 😄"
-        );
+        assert_eq!(replace_shortcodes("``a :smile: b`` :smile:"), "``a :smile: b`` 😄");
+        assert_eq!(replace_shortcodes("```\n:smile:\n```\n:smile:"), "```\n:smile:\n```\n😄");
+        assert_eq!(replace_shortcodes("unterminated ` :smile:"), "unterminated ` 😄");
     }
 
     #[test]
     fn custom_emoji_is_untouched() {
-        assert_eq!(
-            replace_shortcodes("<:smile:123> :smile:"),
-            "<:smile:123> 😄"
-        );
+        assert_eq!(replace_shortcodes("<:smile:123> :smile:"), "<:smile:123> 😄");
         assert_eq!(replace_shortcodes("<a:smile:123>"), "<a:smile:123>");
     }
 
@@ -280,10 +242,7 @@ mod tests {
         let first_contains = r.iter().position(|&(_, s)| !s.starts_with("smil"));
         let last_prefix = r.iter().rposition(|&(_, s)| s.starts_with("smil"));
         if let (Some(c), Some(p)) = (first_contains, last_prefix) {
-            assert!(
-                p < c,
-                "prefix matches must precede substring matches: {r:?}"
-            );
+            assert!(p < c, "prefix matches must precede substring matches: {r:?}");
         }
         assert_eq!(search("smile", 1)[0].1, "smile");
         assert_eq!(search("smile", 3).len(), 3);

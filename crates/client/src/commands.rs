@@ -80,9 +80,11 @@ impl Backend {
             Command::JumpToMessage { channel_id, message_id } => self.jump_to(channel_id, message_id),
             Command::SendMessage { channel_id, content, reply_to, mention_reply, files, sticker_ids } => {
                 let nonce = random_nonce();
-                let label = if content.is_empty() && !files.is_empty() { format!("Uploading {} file(s)…", files.len()) } else { content.clone() };
+                let label =
+                    if content.is_empty() && !files.is_empty() { format!("Uploading {} file(s)…", files.len()) } else { content.clone() };
                 self.store().add_pending(channel_id, nonce.clone(), label);
-                self.pending_sends.insert(nonce.clone(), PendingSend { channel: channel_id, content, reply_to, mention_reply, files, sticker_ids });
+                self.pending_sends
+                    .insert(nonce.clone(), PendingSend { channel: channel_id, content, reply_to, mention_reply, files, sticker_ids });
                 self.send_pending(nonce);
             }
             Command::RetrySend { channel_id, nonce } => {
@@ -230,7 +232,14 @@ impl Backend {
                 let mut store = self.store();
                 if let Some(me) = store.me() {
                     let activities = custom
-                        .map(|c| vec![dn_core::Activity { name: "Custom Status".into(), kind: dn_core::Activity::CUSTOM, state: Some(c), ..Default::default() }])
+                        .map(|c| {
+                            vec![dn_core::Activity {
+                                name: "Custom Status".into(),
+                                kind: dn_core::Activity::CUSTOM,
+                                state: Some(c),
+                                ..Default::default()
+                            }]
+                        })
                         .unwrap_or_default();
                     let p = Presence { user: PresenceUser { id: me, ..Default::default() }, guild_id: None, status, activities };
                     if status == Status::Offline || status == Status::Invisible {
@@ -328,12 +337,13 @@ impl Backend {
         let needs_cache = self.store().channel_messages(channel).is_none_or(|cm| !cm.loaded_once);
         if needs_cache
             && let Some(storage) = self.storage.clone()
-                && let Ok(Ok(cached)) = storage.call(move |s| s.load_messages(channel, None, PAGE as usize)).await
-                    && !cached.is_empty() {
-                        // Shown immediately; the REST page below reconciles edits/deletions.
-                        self.store().messages_loaded(channel, cached, None, false);
-                        self.link.repaint.now();
-                    }
+            && let Ok(Ok(cached)) = storage.call(move |s| s.load_messages(channel, None, PAGE as usize)).await
+            && !cached.is_empty()
+        {
+            // Shown immediately; the REST page below reconciles edits/deletions.
+            self.store().messages_loaded(channel, cached, None, false);
+            self.link.repaint.now();
+        }
         let fresh = self.last_fetch.get(&channel).is_some_and(|t| t.elapsed() < Duration::from_secs(30));
         if !fresh || needs_cache {
             self.fetch_latest(channel);
@@ -417,7 +427,8 @@ impl Backend {
                         uploads.push(FileUpload { filename, bytes, content_type: None, spoiler: false });
                     }
                     Err(e) => {
-                        let _ = internal.send(Internal::SendFailed { channel, nonce: n, error: format!("can't read {}: {e}", path.display()) });
+                        let _ =
+                            internal.send(Internal::SendFailed { channel, nonce: n, error: format!("can't read {}: {e}", path.display()) });
                         return;
                     }
                 }
@@ -452,7 +463,8 @@ impl Backend {
 
     fn search(&mut self, req: SearchRequest) {
         let storage = self.storage.clone();
-        let has_content_intent = self.session.as_ref().is_some_and(|s| s.intents.contains(Intents::MESSAGE_CONTENT)) && !self.degraded_intents;
+        let has_content_intent =
+            self.session.as_ref().is_some_and(|s| s.intents.contains(Intents::MESSAGE_CONTENT)) && !self.degraded_intents;
         let link = self.link.clone();
         let rest = self.rest();
         tokio::spawn(async move {
@@ -469,7 +481,13 @@ impl Backend {
                 for _ in 0..3 {
                     match rest.search_guild_messages(guild, &q).await {
                         Ok(SearchOutcome::Results { total, messages }) => {
-                            link.emit(UiEvent::SearchResults { request: Box::new(req), total, messages, source: SearchSource::Discord, note: None });
+                            link.emit(UiEvent::SearchResults {
+                                request: Box::new(req),
+                                total,
+                                messages,
+                                source: SearchSource::Discord,
+                                note: None,
+                            });
                             return;
                         }
                         Ok(SearchOutcome::Indexing { retry_after }) => {

@@ -8,15 +8,7 @@ use crate::textures::Textures;
 use crate::theme::Palette;
 
 /// Circular avatar with an optional status dot and speaking ring.
-pub fn avatar(
-    ui: &mut Ui,
-    textures: &mut Textures,
-    p: &Palette,
-    url: &str,
-    size: f32,
-    status: Option<Status>,
-    speaking: bool,
-) -> Response {
+pub fn avatar(ui: &mut Ui, textures: &mut Textures, p: &Palette, url: &str, size: f32, status: Option<Status>, speaking: bool) -> Response {
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
     if ui.is_rect_visible(rect) {
         paint_avatar(ui, textures, p, url, rect, status, speaking);
@@ -125,7 +117,8 @@ pub fn nav_row(ui: &mut Ui, p: &Palette, selected: bool, height: f32, add: impl 
     } else if resp.hovered() {
         ui.painter().rect_filled(rect, CornerRadius::same(4), p.hover);
     }
-    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(8.0, 0.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
+    let mut child = ui
+        .new_child(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(8.0, 0.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
     add(&mut child, resp.hovered());
     resp
 }

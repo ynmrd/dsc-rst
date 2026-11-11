@@ -66,10 +66,7 @@ async fn messages_page_query_and_order() {
         .and(path("/channels/10/messages"))
         .and(query_param("limit", "50"))
         .and(query_param("before", "999"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(json!([message_json(3, 10, "newest"), message_json(2, 10, "older")])),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([message_json(3, 10, "newest"), message_json(2, 10, "older")])))
         .expect(1)
         .mount(&server)
         .await;
@@ -114,18 +111,12 @@ async fn gateway_bot_and_application_and_threads() {
         .await;
     Mock::given(method("GET"))
         .and(path("/applications/@me"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(json!({"id": "11", "name": "App", "bot_public": true, "flags": 8192})),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id": "11", "name": "App", "bot_public": true, "flags": 8192})))
         .mount(&server)
         .await;
     Mock::given(method("GET"))
         .and(path("/guilds/3/threads/active"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(json!({"threads": [{"id": "77", "type": 11, "name": "t"}], "members": []})),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"threads": [{"id": "77", "type": 11, "name": "t"}], "members": []})))
         .mount(&server)
         .await;
     let gw = client.gateway_bot().await.unwrap();
@@ -180,12 +171,7 @@ async fn multipart_upload() {
         content: "pic".into(),
         files: vec![
             FileUpload { filename: "cat.png".into(), bytes: b"PNGDATA".to_vec(), content_type: None, spoiler: false },
-            FileUpload {
-                filename: "secret.txt".into(),
-                bytes: b"hidden".to_vec(),
-                content_type: Some("text/plain".into()),
-                spoiler: true,
-            },
+            FileUpload { filename: "secret.txt".into(), bytes: b"hidden".to_vec(), content_type: Some("text/plain".into()), spoiler: true },
         ],
         ..Default::default()
     };
@@ -206,10 +192,7 @@ async fn multipart_upload() {
     let json_end = json_start + body[json_start..].find("\r\n--").unwrap();
     let payload: Value = serde_json::from_str(&body[json_start..json_end]).unwrap();
     assert_eq!(payload["content"], "pic");
-    assert_eq!(
-        payload["attachments"],
-        json!([{"id": 0, "filename": "cat.png"}, {"id": 1, "filename": "SPOILER_secret.txt"}])
-    );
+    assert_eq!(payload["attachments"], json!([{"id": 0, "filename": "cat.png"}, {"id": 1, "filename": "SPOILER_secret.txt"}]));
 }
 
 #[tokio::test]
@@ -364,9 +347,7 @@ async fn forbidden_and_not_found_and_form_errors() {
     let (server, client) = setup().await;
     Mock::given(method("DELETE"))
         .and(path("/channels/1/messages/2"))
-        .respond_with(
-            ResponseTemplate::new(403).set_body_json(json!({"message": "Missing Permissions", "code": 50013})),
-        )
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({"message": "Missing Permissions", "code": 50013})))
         .expect(1)
         .mount(&server)
         .await;
@@ -391,11 +372,7 @@ async fn forbidden_and_not_found_and_form_errors() {
     let err = client.edit_message(Id(1), Id(3), "x").await.unwrap_err();
     assert_eq!(
         err,
-        ApiError::Http {
-            status: 400,
-            code: Some(50035),
-            message: "Invalid Form Body (content: Must be 2000 or fewer in length.)".into()
-        }
+        ApiError::Http { status: 400, code: Some(50035), message: "Invalid Form Body (content: Must be 2000 or fewer in length.)".into() }
     );
     assert!(!err.is_retryable());
 }
@@ -403,23 +380,13 @@ async fn forbidden_and_not_found_and_form_errors() {
 #[tokio::test]
 async fn transient_errors_retry_only_idempotent() {
     let (server, client) = setup().await;
-    Mock::given(method("GET"))
-        .and(path("/channels/1"))
-        .respond_with(ResponseTemplate::new(503))
-        .up_to_n_times(1)
-        .mount(&server)
-        .await;
+    Mock::given(method("GET")).and(path("/channels/1")).respond_with(ResponseTemplate::new(503)).up_to_n_times(1).mount(&server).await;
     Mock::given(method("GET"))
         .and(path("/channels/1"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id": "1"})))
         .mount(&server)
         .await;
-    Mock::given(method("POST"))
-        .and(path("/channels/1/typing"))
-        .respond_with(ResponseTemplate::new(502))
-        .expect(1)
-        .mount(&server)
-        .await;
+    Mock::given(method("POST")).and(path("/channels/1/typing")).respond_with(ResponseTemplate::new(502)).expect(1).mount(&server).await;
     client.channel(Id(1)).await.unwrap();
     assert_eq!(server.received_requests().await.unwrap().len(), 2);
     let err = client.trigger_typing(Id(1)).await.unwrap_err();
@@ -438,10 +405,7 @@ async fn search_indexing_returns_202() {
         .expect(1)
         .mount(&server)
         .await;
-    let out = client
-        .search_guild_messages(Id(5), &SearchQuery { content: Some("hi".into()), ..Default::default() })
-        .await
-        .unwrap();
+    let out = client.search_guild_messages(Id(5), &SearchQuery { content: Some("hi".into()), ..Default::default() }).await.unwrap();
     assert_eq!(out, SearchOutcome::Indexing { retry_after: 2.0 });
 }
 
@@ -531,8 +495,7 @@ async fn pins_and_dm_and_thread() {
         .and(path("/users/@me/channels"))
         .and(body_json(json!({"recipient_id": "42"})))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(json!({"id": "300", "type": 1, "recipients": [{"id": "42", "username": "alice"}]})),
+            ResponseTemplate::new(200).set_body_json(json!({"id": "300", "type": 1, "recipients": [{"id": "42", "username": "alice"}]})),
         )
         .expect(1)
         .mount(&server)

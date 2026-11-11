@@ -34,11 +34,7 @@ fn floor_boundary(text: &str, mut i: usize) -> usize {
 pub fn completion_at(text: &str, cursor_byte: usize) -> Option<CompletionToken> {
     let cursor = floor_boundary(text, cursor_byte);
     let before = &text[..cursor];
-    let start = before
-        .char_indices()
-        .rev()
-        .find(|(_, c)| c.is_whitespace())
-        .map_or(0, |(i, c)| i + c.len_utf8());
+    let start = before.char_indices().rev().find(|(_, c)| c.is_whitespace()).map_or(0, |(i, c)| i + c.len_utf8());
     let word = &before[start..];
     let trigger = word.chars().next()?;
     let query = &word[trigger.len_utf8()..];
@@ -46,9 +42,7 @@ pub fn completion_at(text: &str, cursor_byte: usize) -> Option<CompletionToken> 
         '@' => CompletionKind::User,
         '#' => CompletionKind::Channel,
         ':' => {
-            let valid = query
-                .chars()
-                .all(|c| c.is_alphanumeric() || matches!(c, '_' | '+' | '-'));
+            let valid = query.chars().all(|c| c.is_alphanumeric() || matches!(c, '_' | '+' | '-'));
             if query.chars().count() < 2 || !valid {
                 return None;
             }
@@ -56,21 +50,12 @@ pub fn completion_at(text: &str, cursor_byte: usize) -> Option<CompletionToken> 
         }
         _ => return None,
     };
-    Some(CompletionToken {
-        kind,
-        start,
-        query: query.to_string(),
-    })
+    Some(CompletionToken { kind, start, query: query.to_string() })
 }
 
 /// Replaces the token (from its trigger up to the cursor) with `replacement` plus a trailing space.
 /// An existing space after the cursor is reused. Returns the new text and cursor position.
-pub fn apply_completion(
-    text: &str,
-    token: &CompletionToken,
-    cursor_byte: usize,
-    replacement: &str,
-) -> (String, usize) {
+pub fn apply_completion(text: &str, token: &CompletionToken, cursor_byte: usize, replacement: &str) -> (String, usize) {
     let cursor = floor_boundary(text, cursor_byte);
     let start = floor_boundary(text, token.start).min(cursor);
     let after = &text[cursor..];
@@ -99,15 +84,7 @@ pub fn split_message(content: &str, limit: usize) -> Vec<String> {
     if utf16_len(content) <= limit {
         return vec![content.to_string()];
     }
-    let mut sp = Splitter {
-        limit,
-        fences: limit >= 24,
-        chunks: Vec::new(),
-        cur: String::new(),
-        len: 0,
-        has_body: false,
-        fence: None,
-    };
+    let mut sp = Splitter { limit, fences: limit >= 24, chunks: Vec::new(), cur: String::new(), len: 0, has_body: false, fence: None };
     for line in content.split('\n') {
         sp.line(line);
     }
@@ -140,11 +117,7 @@ impl Splitter {
         let tail = line.rfind(FENCE).map_or("", |i| line[i + 3..].trim());
         let lang = if is_lang(tail) { tail } else { "" };
         let prefix = format!("{FENCE}{lang}\n");
-        Some(if utf16_len(&prefix) + CLOSE_RESERVE > self.limit / 2 {
-            format!("{FENCE}\n")
-        } else {
-            prefix
-        })
+        Some(if utf16_len(&prefix) + CLOSE_RESERVE > self.limit / 2 { format!("{FENCE}\n") } else { prefix })
     }
 
     fn append(&mut self, piece: &str) {
@@ -190,11 +163,7 @@ impl Splitter {
                 self.flush();
                 continue;
             }
-            let reserve = if self.fence.is_some() {
-                CLOSE_RESERVE
-            } else {
-                0
-            };
+            let reserve = if self.fence.is_some() { CLOSE_RESERVE } else { 0 };
             let cap = self.limit.saturating_sub(self.len + reserve).max(2);
             let cut = cut_point(rest, cap);
             let piece = rest[..cut].trim_end_matches(' ');
@@ -247,20 +216,11 @@ mod tests {
     #[test]
     fn completion_kinds() {
         let t = tok("hello @ali", 10).unwrap();
-        assert_eq!(
-            (t.kind, t.start, t.query.as_str()),
-            (CompletionKind::User, 6, "ali")
-        );
+        assert_eq!((t.kind, t.start, t.query.as_str()), (CompletionKind::User, 6, "ali"));
         let t = tok("#gen", 4).unwrap();
-        assert_eq!(
-            (t.kind, t.start, t.query.as_str()),
-            (CompletionKind::Channel, 0, "gen")
-        );
+        assert_eq!((t.kind, t.start, t.query.as_str()), (CompletionKind::Channel, 0, "gen"));
         let t = tok("go :smi", 7).unwrap();
-        assert_eq!(
-            (t.kind, t.start, t.query.as_str()),
-            (CompletionKind::Emoji, 3, "smi")
-        );
+        assert_eq!((t.kind, t.start, t.query.as_str()), (CompletionKind::Emoji, 3, "smi"));
         assert_eq!(tok("@", 1).unwrap().query, "");
         assert_eq!(tok("a\n@bob", 6).unwrap().start, 2);
     }
@@ -291,25 +251,12 @@ mod tests {
     #[test]
     fn apply_completion_replaces_and_moves_cursor() {
         let t = tok("hi @al", 6).unwrap();
-        assert_eq!(
-            apply_completion("hi @al", &t, 6, "<@123>"),
-            ("hi <@123> ".to_string(), 10)
-        );
+        assert_eq!(apply_completion("hi @al", &t, 6, "<@123>"), ("hi <@123> ".to_string(), 10));
         let t = tok("hi @al there", 6).unwrap();
-        assert_eq!(
-            apply_completion("hi @al there", &t, 6, "<@123>"),
-            ("hi <@123> there".to_string(), 10)
-        );
+        assert_eq!(apply_completion("hi @al there", &t, 6, "<@123>"), ("hi <@123> there".to_string(), 10));
         let t = tok(":smi", 4).unwrap();
-        assert_eq!(
-            apply_completion(":smi", &t, 4, "😄"),
-            ("😄 ".to_string(), 5)
-        );
-        let bogus = CompletionToken {
-            kind: CompletionKind::User,
-            start: 99,
-            query: String::new(),
-        };
+        assert_eq!(apply_completion(":smi", &t, 4, "😄"), ("😄 ".to_string(), 5));
+        let bogus = CompletionToken { kind: CompletionKind::User, start: 99, query: String::new() };
         assert_eq!(apply_completion("ab", &bogus, 2, "x").0, "abx ");
     }
 
@@ -326,10 +273,7 @@ mod tests {
 
     #[test]
     fn splits_on_lines_then_spaces() {
-        let text = (0..50)
-            .map(|i| format!("line number {i:02}"))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let text = (0..50).map(|i| format!("line number {i:02}")).collect::<Vec<_>>().join("\n");
         let chunks = split_message(&text, 100);
         assert!(chunks.len() > 1);
         assert!(chunks.iter().all(|c| units(c) <= 100));
@@ -338,11 +282,7 @@ mod tests {
         let words = vec!["word"; 1000].join(" ");
         let chunks = split_message(&words, 2000);
         assert_eq!(chunks.len(), 3);
-        assert!(
-            chunks
-                .iter()
-                .all(|c| units(c) <= 2000 && !c.starts_with(' ') && !c.ends_with(' '))
-        );
+        assert!(chunks.iter().all(|c| units(c) <= 2000 && !c.starts_with(' ') && !c.ends_with(' ')));
         assert_eq!(chunks.join(" "), words);
     }
 
@@ -361,10 +301,7 @@ mod tests {
 
     #[test]
     fn fences_are_closed_and_reopened() {
-        let body = (0..40)
-            .map(|i| format!("let x{i} = {i};"))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let body = (0..40).map(|i| format!("let x{i} = {i};")).collect::<Vec<_>>().join("\n");
         let text = format!("intro\n```rust\n{body}\n```\noutro");
         let chunks = split_message(&text, 200);
         assert!(chunks.len() > 2);
@@ -372,19 +309,9 @@ mod tests {
         for c in &chunks {
             assert_eq!(c.matches("```").count() % 2, 0, "unbalanced fence in {c:?}");
         }
-        assert!(
-            chunks[1..chunks.len() - 1]
-                .iter()
-                .all(|c| c.starts_with("```rust\n"))
-                || chunks[1].starts_with("```rust\n")
-        );
+        assert!(chunks[1..chunks.len() - 1].iter().all(|c| c.starts_with("```rust\n")) || chunks[1].starts_with("```rust\n"));
         assert!(chunks.last().unwrap().ends_with("outro"));
-        let code: String = chunks
-            .iter()
-            .flat_map(|c| c.lines())
-            .filter(|l| l.starts_with("let "))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let code: String = chunks.iter().flat_map(|c| c.lines()).filter(|l| l.starts_with("let ")).collect::<Vec<_>>().join("\n");
         assert_eq!(code, body);
     }
 

@@ -393,11 +393,7 @@ impl Guild {
 
     /// Up to three initials, like the official client's icon fallback.
     pub fn initials(&self) -> String {
-        self.name
-            .split_whitespace()
-            .filter_map(|w| w.chars().next())
-            .take(3)
-            .collect()
+        self.name.split_whitespace().filter_map(|w| w.chars().next()).take(3).collect()
     }
 }
 
@@ -434,8 +430,7 @@ pub struct Attachment {
 
 impl Attachment {
     pub fn is_image(&self) -> bool {
-        self.content_type.as_deref().is_some_and(|c| c.starts_with("image/"))
-            || (self.width.is_some() && !self.is_video())
+        self.content_type.as_deref().is_some_and(|c| c.starts_with("image/")) || (self.width.is_some() && !self.is_video())
     }
     pub fn is_video(&self) -> bool {
         self.content_type.as_deref().is_some_and(|c| c.starts_with("video/"))
@@ -624,11 +619,7 @@ impl Message {
 
     /// Name shown for the author: guild nickname, then global name, then username.
     pub fn author_name(&self) -> &str {
-        self.member
-            .as_ref()
-            .and_then(|m| m.nick.as_deref())
-            .filter(|n| !n.is_empty())
-            .unwrap_or_else(|| self.author.display_name())
+        self.member.as_ref().and_then(|m| m.nick.as_deref()).filter(|n| !n.is_empty()).unwrap_or_else(|| self.author.display_name())
     }
 
     pub fn mentions_user(&self, user: Id) -> bool {

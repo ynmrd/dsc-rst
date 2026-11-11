@@ -153,12 +153,8 @@ pub struct PresenceUpdate {
 
 impl PresenceUpdate {
     pub(crate) fn to_json(&self) -> Value {
-        let since = (self.status == Status::Idle).then(|| {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0)
-        });
+        let since = (self.status == Status::Idle)
+            .then(|| std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0));
         let activities: Vec<Value> = self
             .activity
             .as_deref()
@@ -362,10 +358,7 @@ mod tests {
             user_ids: vec![],
             nonce: Some("n".into()),
         };
-        assert_eq!(
-            c.to_json(),
-            json!({"op": 8, "d": {"guild_id": "1", "query": "", "limit": 0, "presences": true, "nonce": "n"}})
-        );
+        assert_eq!(c.to_json(), json!({"op": 8, "d": {"guild_id": "1", "query": "", "limit": 0, "presences": true, "nonce": "n"}}));
         let c = GatewayCommand::RequestGuildMembers {
             guild_id: Id(1),
             query: Some("x".into()),

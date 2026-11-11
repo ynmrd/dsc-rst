@@ -5,8 +5,7 @@ use std::time::Duration;
 
 use dn_core::{Dispatch, Id};
 use dn_gateway::{
-    ConnectionState, FatalError, GatewayCommand, GatewayConfig, GatewayEvent, GatewayHandle, Intents, VoiceStateUpdate,
-    spawn,
+    ConnectionState, FatalError, GatewayCommand, GatewayConfig, GatewayEvent, GatewayHandle, Intents, VoiceStateUpdate, spawn,
 };
 use flate2::{Compress, Compression, FlushCompress};
 use futures_util::{SinkExt, StreamExt};
@@ -58,12 +57,7 @@ impl TestServer {
 }
 
 fn config(server: &TestServer) -> GatewayConfig {
-    GatewayConfig {
-        url: Some(server.url.clone()),
-        compress: false,
-        ..GatewayConfig::new(TOKEN, Intents::default_client())
-    }
-    .test_timings()
+    GatewayConfig { url: Some(server.url.clone()), compress: false, ..GatewayConfig::new(TOKEN, Intents::default_client()) }.test_timings()
 }
 
 async fn send(ws: &mut ServerWs, v: Value) {
@@ -187,10 +181,7 @@ async fn identify_ready_and_dispatch() {
     assert_eq!(d["intents"], Intents::default_client().0);
     // GUILDS|GUILD_MEMBERS|GUILD_EXPRESSIONS|bits 7..=15|GUILD_MESSAGE_POLLS|DIRECT_MESSAGE_POLLS
     assert_eq!(d["intents"], 50_397_067u64);
-    assert_eq!(
-        d["properties"],
-        json!({ "os": std::env::consts::OS, "browser": "DiscordNative", "device": "DiscordNative" })
-    );
+    assert_eq!(d["properties"], json!({ "os": std::env::consts::OS, "browser": "DiscordNative", "device": "DiscordNative" }));
     assert_eq!(d["compress"], false);
     assert_eq!(d["large_threshold"], 250);
     assert!(is_state(&next_event(&mut rx).await, ConnectionState::Identifying));

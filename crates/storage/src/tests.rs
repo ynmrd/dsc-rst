@@ -1,6 +1,6 @@
 use dn_core::{
-    Attachment, Channel, ChannelKind, Embed, EmbedField, Emoji, Id, Member, Message, MessageReference, Poll, PollAnswer,
-    PollMedia, Reaction, StickerItem, User,
+    Attachment, Channel, ChannelKind, Embed, EmbedField, Emoji, Id, Member, Message, MessageReference, Poll, PollAnswer, PollMedia,
+    Reaction, StickerItem, User,
 };
 
 use super::*;
@@ -194,10 +194,50 @@ fn search_filters() {
 fn adversarial_queries_never_error() {
     let s = search_fixture();
     let nasty = [
-        "\"", "\"\"", "\"unterminated", "*", "**", "hel*", "AND", "OR", "NOT", "a AND", "NEAR(", "NEAR(a b)", "NEAR(a b, 2)", "-", "--x",
-        "-hello", "^hello", "content:hello", "author_name:bob", "{content}: hello", "(", ")", "((a)", "a OR (b", "héllo", "🔥", "🔥🔥🔥",
-        "東京 AND", "\u{0}", "hello\u{0}world", "'; DROP TABLE messages; --", "%", "_", "\\", "a\"b\"c", "\n\t ", "\u{202e}hello",
-        "+", ":", "::", "a:b:c", "NEAR", "hello world foo bar baz qux", &"x".repeat(10_000),
+        "\"",
+        "\"\"",
+        "\"unterminated",
+        "*",
+        "**",
+        "hel*",
+        "AND",
+        "OR",
+        "NOT",
+        "a AND",
+        "NEAR(",
+        "NEAR(a b)",
+        "NEAR(a b, 2)",
+        "-",
+        "--x",
+        "-hello",
+        "^hello",
+        "content:hello",
+        "author_name:bob",
+        "{content}: hello",
+        "(",
+        ")",
+        "((a)",
+        "a OR (b",
+        "héllo",
+        "🔥",
+        "🔥🔥🔥",
+        "東京 AND",
+        "\u{0}",
+        "hello\u{0}world",
+        "'; DROP TABLE messages; --",
+        "%",
+        "_",
+        "\\",
+        "a\"b\"c",
+        "\n\t ",
+        "\u{202e}hello",
+        "+",
+        ":",
+        "::",
+        "a:b:c",
+        "NEAR",
+        "hello world foo bar baz qux",
+        &"x".repeat(10_000),
     ];
     for q in nasty {
         s.search(&SearchFilter { query: q.into(), ..Default::default() }).unwrap_or_else(|e| panic!("query {q:?} failed: {e}"));
@@ -403,7 +443,10 @@ fn newer_schema_is_an_error_not_a_reset() {
     let err = Storage::open(&path).err().expect("must fail");
     assert!(matches!(err, StorageError::Sqlite(ref m) if m.contains("newer")), "{err:?}");
     assert!(path.exists());
-    assert_eq!(std::fs::read_dir(dir.path()).unwrap().filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().contains("corrupt")).count(), 0);
+    assert_eq!(
+        std::fs::read_dir(dir.path()).unwrap().filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().contains("corrupt")).count(),
+        0
+    );
 }
 
 #[tokio::test]

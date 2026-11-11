@@ -61,7 +61,11 @@ fn failed(event: MediaEvent) -> String {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetches_decodes_and_downscales() {
     let server = MockServer::start().await;
-    Mock::given(method("GET")).and(path("/big.png")).respond_with(ResponseTemplate::new(200).set_body_bytes(png(400, 200))).mount(&server).await;
+    Mock::given(method("GET"))
+        .and(path("/big.png"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(png(400, 200)))
+        .mount(&server)
+        .await;
 
     let (loader, wakes) = loader(MediaConfig::default());
     let url = format!("{}/big.png", server.uri());
@@ -121,7 +125,11 @@ async fn concurrent_and_repeated_requests_hit_the_network_once() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn disk_cache_serves_a_second_loader_without_network() {
     let server = MockServer::start().await;
-    Mock::given(method("GET")).and(path("/img.png")).respond_with(ResponseTemplate::new(200).set_body_bytes(png(64, 32))).mount(&server).await;
+    Mock::given(method("GET"))
+        .and(path("/img.png"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(png(64, 32)))
+        .mount(&server)
+        .await;
     let dir = tempfile::tempdir().unwrap();
 
     let (first, _) = loader(cached_in(dir.path()));
@@ -182,7 +190,10 @@ async fn http_errors_fail_then_honour_the_cooldown() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn corrupt_bytes_fail_and_are_not_cached() {
     let server = MockServer::start().await;
-    Mock::given(method("GET")).respond_with(ResponseTemplate::new(200).set_body_bytes(b"<html>not an image</html>".to_vec())).mount(&server).await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(b"<html>not an image</html>".to_vec()))
+        .mount(&server)
+        .await;
     let dir = tempfile::tempdir().unwrap();
 
     let (loader, _) = loader(cached_in(dir.path()));
@@ -258,7 +269,10 @@ async fn cancel_all_drops_in_flight_work_and_resets_state() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn many_urls_complete_with_limited_concurrency() {
     let server = MockServer::start().await;
-    Mock::given(method("GET")).respond_with(ResponseTemplate::new(200).set_body_bytes(png(16, 16)).set_delay(Duration::from_millis(20))).mount(&server).await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(png(16, 16)).set_delay(Duration::from_millis(20)))
+        .mount(&server)
+        .await;
 
     let cfg = MediaConfig { max_concurrent: 2, ..MediaConfig::default() };
     let (loader, _) = loader(cfg);

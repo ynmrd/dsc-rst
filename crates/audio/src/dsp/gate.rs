@@ -24,13 +24,7 @@ impl Gate {
     pub const DEFAULT_FRAME_MS: u32 = 20;
 
     pub fn new(mode: GateMode) -> Self {
-        Self {
-            mode,
-            frame_ms: Self::DEFAULT_FRAME_MS,
-            hangover_ms: Self::DEFAULT_HANGOVER_MS,
-            open: false,
-            hold_frames: 0,
-        }
+        Self { mode, frame_ms: Self::DEFAULT_FRAME_MS, hangover_ms: Self::DEFAULT_HANGOVER_MS, open: false, hold_frames: 0 }
     }
 
     pub fn with_hangover_ms(mut self, hangover_ms: u32) -> Self {
@@ -94,17 +88,12 @@ mod tests {
 
     #[test]
     fn vad_opens_immediately_and_holds_for_hangover() {
-        let mut gate = Gate::new(GateMode::VoiceActivity {
-            threshold_db: -40.0,
-        });
+        let mut gate = Gate::new(GateMode::VoiceActivity { threshold_db: -40.0 });
         assert!(!gate.process(-60.0, false, false));
         assert!(gate.process(-30.0, false, false), "attack is one frame");
         // 300 ms hangover at 20 ms frames = 15 frames below threshold still open.
         for i in 0..15 {
-            assert!(
-                gate.process(-60.0, false, false),
-                "frame {i} should be held open"
-            );
+            assert!(gate.process(-60.0, false, false), "frame {i} should be held open");
         }
         assert!(!gate.process(-60.0, false, false));
         assert!(!gate.is_open());
@@ -112,10 +101,7 @@ mod tests {
 
     #[test]
     fn vad_hangover_restarts_on_new_speech() {
-        let mut gate = Gate::new(GateMode::VoiceActivity {
-            threshold_db: -40.0,
-        })
-        .with_hangover_ms(100);
+        let mut gate = Gate::new(GateMode::VoiceActivity { threshold_db: -40.0 }).with_hangover_ms(100);
         assert!(gate.process(-20.0, false, false));
         for _ in 0..3 {
             assert!(gate.process(-80.0, false, false));
@@ -129,41 +115,27 @@ mod tests {
 
     #[test]
     fn ptt_release_delay() {
-        let mut gate = Gate::new(GateMode::PushToTalk {
-            release_delay_ms: 60,
-        });
-        assert!(
-            !gate.process(0.0, false, false),
-            "level alone never opens PTT"
-        );
+        let mut gate = Gate::new(GateMode::PushToTalk { release_delay_ms: 60 });
+        assert!(!gate.process(0.0, false, false), "level alone never opens PTT");
         assert!(gate.process(-90.0, true, false));
         for _ in 0..3 {
             assert!(gate.process(-90.0, false, false));
         }
         assert!(!gate.process(-90.0, false, false));
 
-        let mut instant = Gate::new(GateMode::PushToTalk {
-            release_delay_ms: 0,
-        });
+        let mut instant = Gate::new(GateMode::PushToTalk { release_delay_ms: 0 });
         assert!(instant.process(-90.0, true, false));
         assert!(!instant.process(-90.0, false, false));
     }
 
     #[test]
     fn mute_forces_closed_and_clears_hold() {
-        let mut gate = Gate::new(GateMode::VoiceActivity {
-            threshold_db: -40.0,
-        });
+        let mut gate = Gate::new(GateMode::VoiceActivity { threshold_db: -40.0 });
         assert!(gate.process(-10.0, false, false));
         assert!(!gate.process(-10.0, false, true));
-        assert!(
-            !gate.process(-60.0, false, false),
-            "hangover must not survive a mute"
-        );
+        assert!(!gate.process(-60.0, false, false), "hangover must not survive a mute");
 
-        let mut ptt = Gate::new(GateMode::PushToTalk {
-            release_delay_ms: 500,
-        });
+        let mut ptt = Gate::new(GateMode::PushToTalk { release_delay_ms: 500 });
         assert!(!ptt.process(0.0, true, true));
     }
 }

@@ -174,9 +174,7 @@ impl Storage {
 
     /// Newest `limit` messages with an id below `before`, oldest first.
     pub fn load_messages(&self, channel: Id, before: Option<Id>, limit: usize) -> Result<Vec<Message>, StorageError> {
-        let mut stmt = self
-            .conn
-            .prepare_cached("SELECT json FROM messages WHERE channel_id = ?1 AND id < ?2 ORDER BY id DESC LIMIT ?3")?;
+        let mut stmt = self.conn.prepare_cached("SELECT json FROM messages WHERE channel_id = ?1 AND id < ?2 ORDER BY id DESC LIMIT ?3")?;
         let before = before.map_or(i64::MAX, sql_id);
         let rows = stmt.query_map(params![sql_id(channel), before, sql_count(limit)], |r| r.get::<_, String>(0))?;
         let mut out = decode_messages(rows)?;
@@ -185,10 +183,8 @@ impl Storage {
     }
 
     pub fn latest_message_id(&self, channel: Id) -> Result<Option<Id>, StorageError> {
-        let id: Option<i64> = self
-            .conn
-            .prepare_cached("SELECT MAX(id) FROM messages WHERE channel_id = ?1")?
-            .query_row([sql_id(channel)], |r| r.get(0))?;
+        let id: Option<i64> =
+            self.conn.prepare_cached("SELECT MAX(id) FROM messages WHERE channel_id = ?1")?.query_row([sql_id(channel)], |r| r.get(0))?;
         Ok(id.map(from_sql_id))
     }
 
@@ -328,9 +324,7 @@ impl Storage {
     }
 
     pub fn stats(&self) -> Result<StorageStats, StorageError> {
-        let count = |sql: &str| -> Result<u64, StorageError> {
-            Ok(self.conn.query_row(sql, [], |r| r.get::<_, i64>(0))?.max(0) as u64)
-        };
+        let count = |sql: &str| -> Result<u64, StorageError> { Ok(self.conn.query_row(sql, [], |r| r.get::<_, i64>(0))?.max(0) as u64) };
         Ok(StorageStats {
             messages: count("SELECT COUNT(*) FROM messages")?,
             channels: count("SELECT COUNT(DISTINCT channel_id) FROM messages")?,

@@ -17,10 +17,7 @@ use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
 
 use crate::inflate::ZlibStream;
 use crate::ratelimit::SendLimiter;
-use crate::{
-    ConnectionState, Control, DEFAULT_GATEWAY_URL, FatalError, GatewayCommand, GatewayConfig, GatewayEvent,
-    PresenceUpdate,
-};
+use crate::{ConnectionState, Control, DEFAULT_GATEWAY_URL, FatalError, GatewayCommand, GatewayConfig, GatewayEvent, PresenceUpdate};
 
 type Ws = WebSocketStream<MaybeTlsStream<TcpStream>>;
 

@@ -58,20 +58,10 @@ pub enum Inline {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Block {
     Paragraph(Vec<Inline>),
-    CodeBlock {
-        lang: Option<String>,
-        code: String,
-    },
+    CodeBlock { lang: Option<String>, code: String },
     Quote(Vec<Block>),
-    Heading {
-        level: u8,
-        content: Vec<Inline>,
-    },
-    List {
-        ordered: bool,
-        start: u32,
-        items: Vec<Vec<Block>>,
-    },
+    Heading { level: u8, content: Vec<Inline> },
+    List { ordered: bool, start: u32, items: Vec<Vec<Block>> },
     Subtext(Vec<Inline>),
 }
 

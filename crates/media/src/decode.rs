@@ -66,11 +66,8 @@ fn downscale(img: ImageBuffer<Rgba<u8>, Vec<u8>>, limit: u32, has_alpha: bool) -
     if has_alpha {
         premultiply(&mut img);
     }
-    let mut out = if scale < THUMBNAIL_SCALE {
-        imageops::thumbnail(&img, nw, nh)
-    } else {
-        imageops::resize(&img, nw, nh, FilterType::CatmullRom)
-    };
+    let mut out =
+        if scale < THUMBNAIL_SCALE { imageops::thumbnail(&img, nw, nh) } else { imageops::resize(&img, nw, nh, FilterType::CatmullRom) };
     if has_alpha {
         unpremultiply(&mut out);
     }

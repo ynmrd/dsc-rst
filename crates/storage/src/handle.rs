@@ -81,8 +81,7 @@ impl StorageHandle {
     ) -> Result<oneshot::Receiver<Result<R, StorageError>>, StorageError> {
         let (reply, rx) = oneshot::channel();
         let job: Job = Box::new(move |storage| {
-            let out = catch_unwind(AssertUnwindSafe(|| f(storage)))
-                .map_err(|_| StorageError::Sqlite("storage job panicked".into()));
+            let out = catch_unwind(AssertUnwindSafe(|| f(storage))).map_err(|_| StorageError::Sqlite("storage job panicked".into()));
             let _ = reply.send(out);
         });
         self.inner.tx.send(Msg::Job(job)).map_err(|_| StorageError::Closed)?;

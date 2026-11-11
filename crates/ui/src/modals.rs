@@ -15,13 +15,11 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store) {
     let mut close = false;
     let mut next: Option<Modal> = None;
     match modal {
-        Modal::Settings(tab) => {
-            match settings_view::show(app, ctx, store, tab) {
-                settings_view::Outcome::Stay => {}
-                settings_view::Outcome::Switch(t) => next = Some(Modal::Settings(t)),
-                settings_view::Outcome::Close => close = true,
-            }
-        }
+        Modal::Settings(tab) => match settings_view::show(app, ctx, store, tab) {
+            settings_view::Outcome::Stay => {}
+            settings_view::Outcome::Switch(t) => next = Some(Modal::Settings(t)),
+            settings_view::Outcome::Close => close = true,
+        },
         Modal::ConfirmDelete { channel_id, message_id, preview } => {
             let r = dialog(ctx, &p, "confirm-delete", |ui| {
                 ui.label(RichText::new("Delete Message").size(20.0).strong().color(p.text_strong));
@@ -150,7 +148,14 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store) {
                 .session
                 .linked
                 .as_ref()
-                .map(|l| l.guilds.iter().filter(|g| !store.guilds.contains_key(&g.id)).filter(|g| g.owner || g.permissions.contains(dn_core::Permissions::MANAGE_GUILD)).map(|g| (g.id, g.name.clone())).collect())
+                .map(|l| {
+                    l.guilds
+                        .iter()
+                        .filter(|g| !store.guilds.contains_key(&g.id))
+                        .filter(|g| g.owner || g.permissions.contains(dn_core::Permissions::MANAGE_GUILD))
+                        .map(|g| (g.id, g.name.clone()))
+                        .collect()
+                })
                 .unwrap_or_default();
             let r = dialog(ctx, &p, "add-server", |ui| {
                 ui.label(RichText::new("Add the bot to a server").size(20.0).strong().color(p.text_strong));
@@ -178,7 +183,11 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store) {
                         }
                     });
                 } else if store.session.linked.is_none() {
-                    ui.label(RichText::new("Tip: sign in with Discord in Settings → My Account to list your own servers here.").size(12.0).color(p.faint));
+                    ui.label(
+                        RichText::new("Tip: sign in with Discord in Settings → My Account to list your own servers here.")
+                            .size(12.0)
+                            .color(p.faint),
+                    );
                 }
                 let mut out = None;
                 if ui.button("Done").clicked() {
@@ -282,28 +291,35 @@ fn profile(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, user_id
                     }
                 }
                 ui.separator();
-                if let Some(joined) = member.as_ref().and_then(|m| m.joined_at.clone()).and_then(|j| chrono::DateTime::parse_from_rfc3339(&j).ok()) {
+                if let Some(joined) =
+                    member.as_ref().and_then(|m| m.joined_at.clone()).and_then(|j| chrono::DateTime::parse_from_rfc3339(&j).ok())
+                {
                     widgets::section_label(ui, &p, "Member since");
                     ui.label(joined.format("%b %d, %Y").to_string());
                 }
                 widgets::section_label(ui, &p, "Discord member since");
                 ui.label(user_id.datetime().format("%b %d, %Y").to_string());
                 if let (Some(m), Some(gs)) = (&member, guild_id.and_then(|g| store.guilds.get(&g)))
-                    && !m.roles.is_empty() {
-                        widgets::section_label(ui, &p, "Roles");
-                        ui.horizontal_wrapped(|ui| {
-                            for r in m.roles.iter().filter_map(|r| gs.role(*r)) {
-                                let c = r.display_color().map(crate::theme::rgb).unwrap_or(p.muted);
-                                egui::Frame::new().fill(p.sidebar).corner_radius(CornerRadius::same(4)).inner_margin(egui::Margin::symmetric(6, 2)).show(ui, |ui| {
+                    && !m.roles.is_empty()
+                {
+                    widgets::section_label(ui, &p, "Roles");
+                    ui.horizontal_wrapped(|ui| {
+                        for r in m.roles.iter().filter_map(|r| gs.role(*r)) {
+                            let c = r.display_color().map(crate::theme::rgb).unwrap_or(p.muted);
+                            egui::Frame::new()
+                                .fill(p.sidebar)
+                                .corner_radius(CornerRadius::same(4))
+                                .inner_margin(egui::Margin::symmetric(6, 2))
+                                .show(ui, |ui| {
                                     ui.horizontal(|ui| {
                                         let (dot, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
                                         ui.painter().circle_filled(dot.center(), 5.0, c);
                                         ui.label(RichText::new(&r.name).size(12.0));
                                     });
                                 });
-                            }
-                        });
-                    }
+                        }
+                    });
+                }
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     if Some(user_id) != store.me() && !user.bot && widgets::primary_button(ui, &p, "Message").clicked() {
@@ -330,7 +346,13 @@ fn profile(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, user_id
     resp.should_close()
 }
 
-fn quick_switcher(ctx: &egui::Context, store: &Store, p: &crate::theme::Palette, query: &mut String, selected: &mut usize) -> (Option<Id>, bool) {
+fn quick_switcher(
+    ctx: &egui::Context,
+    store: &Store,
+    p: &crate::theme::Palette,
+    query: &mut String,
+    selected: &mut usize,
+) -> (Option<Id>, bool) {
     let q = query.to_lowercase();
     let mut cands: Vec<(i32, Id, String, String)> = vec![];
     for gid in &store.guild_order {
@@ -343,7 +365,12 @@ fn quick_switcher(ctx: &egui::Context, store: &Store, p: &crate::theme::Palette,
                 let name = c.display_name();
                 let score = score(&name.to_lowercase(), &q);
                 if score > 0 {
-                    cands.push((score + store.is_unread(c.id) as i32, c.id, format!("{} {}", sidebar::channel_icon(c.kind), name), gs.guild.name.clone()));
+                    cands.push((
+                        score + store.is_unread(c.id) as i32,
+                        c.id,
+                        format!("{} {}", sidebar::channel_icon(c.kind), name),
+                        gs.guild.name.clone(),
+                    ));
                 }
             }
         }

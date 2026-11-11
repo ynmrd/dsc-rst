@@ -3,6 +3,7 @@
 //! The UI never blocks: it reads `dn_cache::Store` (shared with the backend), sends
 //! `Command`s, and uploads textures decoded on background threads.
 
+mod chat;
 pub mod fonts;
 mod members;
 mod message;
@@ -18,7 +19,6 @@ pub mod textures;
 pub mod theme;
 pub mod virtual_list;
 pub mod widgets;
-mod chat;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -71,9 +71,7 @@ impl DiscordApp {
         let theme = link.settings.read().appearance.theme;
         let st = UiState { window_focused: true, ..Default::default() };
         let repaint_ctx = ctx.clone();
-        link.repaint.install(move |d| {
-            if d.is_zero() { repaint_ctx.request_repaint() } else { repaint_ctx.request_repaint_after(d) }
-        });
+        link.repaint.install(move |d| if d.is_zero() { repaint_ctx.request_repaint() } else { repaint_ctx.request_repaint_after(d) });
         let mut app = DiscordApp {
             link,
             st,
@@ -163,9 +161,7 @@ impl DiscordApp {
                 }
                 UiEvent::RequestAttention => {
                     if !self.st.window_focused && self.link.settings.read().notifications.flash_taskbar {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(
-                            egui::UserAttentionType::Informational,
-                        ));
+                        ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(egui::UserAttentionType::Informational));
                     }
                 }
             }
@@ -221,9 +217,10 @@ impl DiscordApp {
                 self.st.editing = None;
             } else if let Some(c) = self.st.selected_channel
                 && self.st.composer(c).reply_to.take().is_none()
-                    && let Some(last) = store.channels.get(&c).and_then(|ch| ch.last_message_id) {
-                        self.link.send(Command::MarkRead { channel_id: c, message_id: last });
-                    }
+                && let Some(last) = store.channels.get(&c).and_then(|ch| ch.last_message_id)
+            {
+                self.link.send(Command::MarkRead { channel_id: c, message_id: last });
+            }
         }
         if alt_up || alt_down {
             self.step_channel(store, if alt_up { -1 } else { 1 });
@@ -284,9 +281,10 @@ impl DiscordApp {
         // The backend serves cached history immediately and refreshes the latest page.
         self.link.send(Command::OpenChannel { channel_id: channel });
         if let Some(g) = guild
-            && store.guilds.get(&g).is_some_and(|gs| !gs.members_requested) {
-                self.link.send(Command::RequestMembers { guild_id: g });
-            }
+            && store.guilds.get(&g).is_some_and(|gs| !gs.members_requested)
+        {
+            self.link.send(Command::RequestMembers { guild_id: g });
+        }
     }
 
     pub fn select_guild(&mut self, store: &mut Store, guild: Option<Id>) {
@@ -339,7 +337,8 @@ impl DiscordApp {
     }
 
     fn handle_dropped_files(&mut self, ctx: &egui::Context) {
-        let files: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).filter(|p| !p.as_os_str().is_empty()).collect());
+        let files: Vec<std::path::PathBuf> =
+            ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).filter(|p| !p.as_os_str().is_empty()).collect());
         if files.is_empty() {
             return;
         }
@@ -355,19 +354,21 @@ impl DiscordApp {
 
     fn poll_dialogs(&mut self) {
         if let Some(rx) = &self.st.file_dialog_rx
-            && let Ok((channel, files)) = rx.try_recv() {
-                let comp = self.st.composer(channel);
-                comp.attachments.extend(files);
-                comp.attachments.truncate(10);
-                self.st.file_dialog_rx = None;
-            }
+            && let Ok((channel, files)) = rx.try_recv()
+        {
+            let comp = self.st.composer(channel);
+            comp.attachments.extend(files);
+            comp.attachments.truncate(10);
+            self.st.file_dialog_rx = None;
+        }
         if let Some(rx) = &self.st.save_dialog_rx
-            && let Ok((url, path)) = rx.try_recv() {
-                if let Some(path) = path {
-                    self.link.send(Command::DownloadTo { url, path });
-                }
-                self.st.save_dialog_rx = None;
+            && let Ok((url, path)) = rx.try_recv()
+        {
+            if let Some(path) = path {
+                self.link.send(Command::DownloadTo { url, path });
             }
+            self.st.save_dialog_rx = None;
+        }
     }
 
     fn sample_process(&mut self) {
@@ -391,9 +392,10 @@ impl DiscordApp {
     #[allow(clippy::needless_pass_by_ref_mut)]
     fn apply_pending_open(&mut self, store: &mut Store) {
         if let Some(c) = self.pending_open.take()
-            && store.channels.contains_key(&c) {
-                self.open_channel(store, c);
-            }
+            && store.channels.contains_key(&c)
+        {
+            self.open_channel(store, c);
+        }
     }
 }
 
@@ -452,15 +454,15 @@ impl DiscordApp {
     fn main_layout(&mut self, ui: &mut Ui, store: &mut Store) {
         let p = self.palette;
         if store.session.demo {
-            egui::Panel::top("demo-banner")
-                .exact_size(26.0)
-                .resizable(false)
-                .frame(egui::Frame::new().fill(p.yellow))
-                .show(ui, |ui| {
-                    ui.centered_and_justified(|ui| {
-                        ui.label(egui::RichText::new("Offline demo data — not connected to Discord. Start without --demo to connect your bot.").color(Color32::BLACK).strong());
-                    });
+            egui::Panel::top("demo-banner").exact_size(26.0).resizable(false).frame(egui::Frame::new().fill(p.yellow)).show(ui, |ui| {
+                ui.centered_and_justified(|ui| {
+                    ui.label(
+                        egui::RichText::new("Offline demo data — not connected to Discord. Start without --demo to connect your bot.")
+                            .color(Color32::BLACK)
+                            .strong(),
+                    );
                 });
+            });
         }
         if self.st.selected_channel.is_none() && store.session.ready && !store.guild_order.is_empty() && self.st.selected_guild.is_none() {
             let first = store.guild_order.first().copied();

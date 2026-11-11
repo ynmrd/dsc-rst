@@ -182,10 +182,11 @@ fn main() -> ExitCode {
 
     let mut result = launch(if use_wgpu { eframe::Renderer::Wgpu } else { eframe::Renderer::Glow });
     if let Err(e) = &result
-        && use_wgpu {
-            tracing::warn!("wgpu renderer failed ({e}); retrying with OpenGL");
-            result = launch(eframe::Renderer::Glow);
-        }
+        && use_wgpu
+    {
+        tracing::warn!("wgpu renderer failed ({e}); retrying with OpenGL");
+        result = launch(eframe::Renderer::Glow);
+    }
 
     ui_link.send(Command::Shutdown);
     if let Some(h) = backend {
@@ -234,7 +235,13 @@ pub enum ShellEvent {
 }
 
 impl Shell {
-    fn new(mut app: DiscordApp, link: UiLink, ctx: &egui::Context, listener: Option<std::net::TcpListener>, notice: Option<String>) -> Self {
+    fn new(
+        mut app: DiscordApp,
+        link: UiLink,
+        ctx: &egui::Context,
+        listener: Option<std::net::TcpListener>,
+        notice: Option<String>,
+    ) -> Self {
         let (tx, rx) = crossbeam_channel::unbounded();
         if let Some(l) = listener {
             instance::serve(l, tx.clone(), ctx.clone());

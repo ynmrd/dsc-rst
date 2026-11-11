@@ -33,9 +33,7 @@ pub fn should_notify(msg: &Message, ctx: &NotifyContext) -> bool {
     match ctx.level {
         NotifyLevel::Nothing => false,
         NotifyLevel::All => true,
-        NotifyLevel::Mentions => {
-            ctx.is_private || is_mention(msg, ctx.self_user_id, ctx.self_role_ids, ctx.suppress_everyone)
-        }
+        NotifyLevel::Mentions => ctx.is_private || is_mention(msg, ctx.self_user_id, ctx.self_role_ids, ctx.suppress_everyone),
     }
 }
 

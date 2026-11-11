@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use dn_core::{Id, Message, MessageUpdate, ReactionEvent, Reaction};
+use dn_core::{Id, Message, MessageUpdate, Reaction, ReactionEvent};
 
 /// Messages for one channel in ascending id order. The window covers a contiguous range
 /// of history; `reached_start` means nothing older exists and `has_newer_gap` means newer

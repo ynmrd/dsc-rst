@@ -106,14 +106,7 @@ fn mentioned_name(msg: &Message, id: Id) -> String {
     msg.mentions
         .iter()
         .find(|u| u.id == id)
-        .map(|u| {
-            u.member
-                .as_ref()
-                .and_then(|m| m.nick.as_deref())
-                .filter(|n| !n.is_empty())
-                .unwrap_or_else(|| u.display_name())
-                .to_owned()
-        })
+        .map(|u| u.member.as_ref().and_then(|m| m.nick.as_deref()).filter(|n| !n.is_empty()).unwrap_or_else(|| u.display_name()).to_owned())
         .unwrap_or_else(|| "user".to_owned())
 }
 

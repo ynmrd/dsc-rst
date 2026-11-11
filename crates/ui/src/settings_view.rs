@@ -53,8 +53,16 @@ pub const MATRIX: &[(&str, Support, &str)] = &[
     ("Direct messages", Support::Partial, "Only DMs with the bot; your personal DMs are not accessible"),
     ("Group DMs, friends list, friend requests", Support::Blocked, "Not exposed to bots/OAuth2 apps"),
     ("Presence / status", Support::AsBot, "Sets the bot's status; others' presence needs the Presence intent"),
-    ("Voice channels: join/leave, two-way audio, mute/deafen", Support::Unverified, "Songbird driver with DAVE E2EE; not yet tested against official clients"),
-    ("Per-user volume, VAD, push-to-talk, noise suppression", Support::Unverified, "Local audio pipeline is tested; Discord interop untested"),
+    (
+        "Voice channels: join/leave, two-way audio, mute/deafen",
+        Support::Unverified,
+        "Songbird driver with DAVE E2EE; not yet tested against official clients",
+    ),
+    (
+        "Per-user volume, VAD, push-to-talk, noise suppression",
+        Support::Unverified,
+        "Local audio pipeline is tested; Discord interop untested",
+    ),
     ("Video, webcam, screen sharing (Go Live)", Support::Blocked, "No documented API for bots or third-party clients"),
     ("GIF picker", Support::Blocked, "Discord's picker uses private endpoints; Tenor API shut down 2026"),
     ("Rich Presence / game activity for your account", Support::Blocked, "RPC scopes are partner-only"),
@@ -94,7 +102,10 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, tab: S
                 }
             }
         });
-        let content = egui::Rect::from_min_max(egui::pos2(nav.right() + 40.0, screen.top() + 40.0), egui::pos2((nav.right() + 780.0).min(screen.right() - 80.0), screen.bottom()));
+        let content = egui::Rect::from_min_max(
+            egui::pos2(nav.right() + 40.0, screen.top() + 40.0),
+            egui::pos2((nav.right() + 780.0).min(screen.right() - 80.0), screen.bottom()),
+        );
         let mut cui = ui.new_child(egui::UiBuilder::new().max_rect(content));
         egui::ScrollArea::vertical().id_salt(("settings", tab as u8)).auto_shrink([false, false]).show(&mut cui, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
@@ -112,9 +123,19 @@ pub fn show(app: &mut DiscordApp, ctx: &egui::Context, store: &mut Store, tab: S
         });
         let close_rect = egui::Rect::from_center_size(egui::pos2(screen.right() - 48.0, screen.top() + 52.0), vec2(36.0, 36.0));
         let close = ui.interact(close_rect, egui::Id::unique("settings-close"), egui::Sense::click());
-        ui.painter().circle_stroke(close_rect.center(), 18.0, egui::Stroke::new(2.0, if close.hovered() { p.text_strong } else { p.muted }));
+        ui.painter().circle_stroke(
+            close_rect.center(),
+            18.0,
+            egui::Stroke::new(2.0, if close.hovered() { p.text_strong } else { p.muted }),
+        );
         ui.painter().text(close_rect.center(), egui::Align2::CENTER_CENTER, "✕", egui::FontId::proportional(16.0), p.text);
-        ui.painter().text(close_rect.center_bottom() + vec2(0.0, 10.0), egui::Align2::CENTER_TOP, "ESC", egui::FontId::proportional(11.0), p.muted);
+        ui.painter().text(
+            close_rect.center_bottom() + vec2(0.0, 10.0),
+            egui::Align2::CENTER_TOP,
+            "ESC",
+            egui::FontId::proportional(11.0),
+            p.muted,
+        );
         if close.clicked() {
             outcome = Outcome::Close;
         }
@@ -156,9 +177,10 @@ fn account(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette) {
                     app.st.modal = Some(crate::state::Modal::Status { custom: String::new() });
                 }
                 if let Some(app_id) = store.session.application_id
-                    && ui.button("Invite bot to a server ↗").clicked() {
-                        let _ = open::that_detached(crate::sidebar::invite_url(app_id, None));
-                    }
+                    && ui.button("Invite bot to a server ↗").clicked()
+                {
+                    let _ = open::that_detached(crate::sidebar::invite_url(app_id, None));
+                }
                 if ui.button("Reconnect").clicked() {
                     app.link.send(Command::Reconnect);
                 }
@@ -186,7 +208,11 @@ fn account(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette) {
                     }
                     ui.label(RichText::new(detail).size(12.0).color(p.muted));
                     if a.credentials_invalid {
-                        ui.label(RichText::new("Bot token rejected by Discord — add the account again with a new token.").size(12.0).color(p.red));
+                        ui.label(
+                            RichText::new("Bot token rejected by Discord — add the account again with a new token.")
+                                .size(12.0)
+                                .color(p.red),
+                        );
                     }
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -209,28 +235,27 @@ fn account(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette) {
     }
     ui.add_space(12.0);
     widgets::section_label(ui, p, "Sign in with Discord (optional)");
-    card(ui, p, |ui| {
-        match &store.session.linked {
-            Some(l) => {
-                ui.horizontal(|ui| {
-                    widgets::avatar(ui, &mut app.textures, p, &l.user.avatar_url(96), 40.0, None, false);
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new(l.user.display_name()).strong().color(p.text_strong));
-                        ui.label(RichText::new(format!("@{} · {} servers", l.user.username, l.guilds.len())).color(p.muted).size(12.0));
-                    });
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Sign out").clicked() {
-                            app.link.send(Command::UnlinkOAuth);
-                        }
-                    });
+    card(ui, p, |ui| match &store.session.linked {
+        Some(l) => {
+            ui.horizontal(|ui| {
+                widgets::avatar(ui, &mut app.textures, p, &l.user.avatar_url(96), 40.0, None, false);
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(l.user.display_name()).strong().color(p.text_strong));
+                    ui.label(RichText::new(format!("@{} · {} servers", l.user.username, l.guilds.len())).color(p.muted).size(12.0));
                 });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Sign out").clicked() {
+                        app.link.send(Command::UnlinkOAuth);
+                    }
+                });
+            });
+        }
+        None => {
+            let expired = accounts.iter().any(|a| a.active && a.oauth_expired);
+            if expired {
+                ui.label(RichText::new("Your Discord sign-in expired. Sign in again.").color(p.yellow));
             }
-            None => {
-                let expired = accounts.iter().any(|a| a.active && a.oauth_expired);
-                if expired {
-                    ui.label(RichText::new("Your Discord sign-in expired. Sign in again.").color(p.yellow));
-                }
-                ui.label(
+            ui.label(
                     RichText::new(
                         "Links your real Discord identity (profile and server list) using OAuth2 with PKCE in your browser. \
                          In the Developer Portal → OAuth2, add the redirect below and enable \"Public Client\" (or enter the client secret).",
@@ -238,47 +263,52 @@ fn account(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette) {
                     .color(p.muted)
                     .size(13.0),
                 );
-                let ob = &mut app.st.onboarding;
-                if ob.port.is_empty() {
-                    ob.port = "53134".into();
-                }
-                ui.horizontal(|ui| {
-                    ui.label("Redirect URI:");
-                    let uri = format!("http://127.0.0.1:{}/callback", ob.port.trim());
-                    ui.label(RichText::new(&uri).monospace());
-                    if ui.small_button("Copy").clicked() {
-                        ui.ctx().copy_text(uri);
-                    }
-                });
-                ui.add(egui::TextEdit::singleline(&mut ob.client_id).hint_text("Application (client) ID").desired_width(320.0));
-                ui.add(egui::TextEdit::singleline(&mut ob.client_secret).password(true).hint_text("Client secret (optional for public clients)").desired_width(320.0));
-                ui.horizontal(|ui| {
-                    ui.label("Port");
-                    ui.add(egui::TextEdit::singleline(&mut ob.port).desired_width(70.0));
-                });
-                ui.horizontal(|ui| {
-                    let busy = app.st.onboarding.oauth_busy;
-                    let id_ok = app.st.onboarding.client_id.trim().chars().all(|c| c.is_ascii_digit()) && !app.st.onboarding.client_id.trim().is_empty();
-                    if ui.add_enabled(!busy && id_ok, egui::Button::new("Sign in with Discord")).clicked() {
-                        let ob = &mut app.st.onboarding;
-                        ob.oauth_busy = true;
-                        let secret = ob.client_secret.trim().to_string();
-                        app.link.send(Command::BeginOAuth {
-                            client_id: ob.client_id.trim().to_string(),
-                            client_secret: (!secret.is_empty()).then_some(secret),
-                            port: ob.port.trim().parse().unwrap_or(53134),
-                        });
-                    }
-                    if busy {
-                        ui.spinner();
-                        ui.label(RichText::new("Waiting for the browser…").color(p.muted));
-                        if ui.button("Cancel").clicked() {
-                            app.link.send(Command::CancelOAuth);
-                            app.st.onboarding.oauth_busy = false;
-                        }
-                    }
-                });
+            let ob = &mut app.st.onboarding;
+            if ob.port.is_empty() {
+                ob.port = "53134".into();
             }
+            ui.horizontal(|ui| {
+                ui.label("Redirect URI:");
+                let uri = format!("http://127.0.0.1:{}/callback", ob.port.trim());
+                ui.label(RichText::new(&uri).monospace());
+                if ui.small_button("Copy").clicked() {
+                    ui.ctx().copy_text(uri);
+                }
+            });
+            ui.add(egui::TextEdit::singleline(&mut ob.client_id).hint_text("Application (client) ID").desired_width(320.0));
+            ui.add(
+                egui::TextEdit::singleline(&mut ob.client_secret)
+                    .password(true)
+                    .hint_text("Client secret (optional for public clients)")
+                    .desired_width(320.0),
+            );
+            ui.horizontal(|ui| {
+                ui.label("Port");
+                ui.add(egui::TextEdit::singleline(&mut ob.port).desired_width(70.0));
+            });
+            ui.horizontal(|ui| {
+                let busy = app.st.onboarding.oauth_busy;
+                let id_ok = app.st.onboarding.client_id.trim().chars().all(|c| c.is_ascii_digit())
+                    && !app.st.onboarding.client_id.trim().is_empty();
+                if ui.add_enabled(!busy && id_ok, egui::Button::new("Sign in with Discord")).clicked() {
+                    let ob = &mut app.st.onboarding;
+                    ob.oauth_busy = true;
+                    let secret = ob.client_secret.trim().to_string();
+                    app.link.send(Command::BeginOAuth {
+                        client_id: ob.client_id.trim().to_string(),
+                        client_secret: (!secret.is_empty()).then_some(secret),
+                        port: ob.port.trim().parse().unwrap_or(53134),
+                    });
+                }
+                if busy {
+                    ui.spinner();
+                    ui.label(RichText::new("Waiting for the browser…").color(p.muted));
+                    if ui.button("Cancel").clicked() {
+                        app.link.send(Command::CancelOAuth);
+                        app.st.onboarding.oauth_busy = false;
+                    }
+                }
+            });
         }
     });
 }
@@ -332,7 +362,10 @@ fn voice(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, s: &mut Settings,
     match s.voice.input_mode {
         InputMode::VoiceActivity => {
             ui.checkbox(&mut s.voice.auto_sensitivity, "Automatically determine input sensitivity");
-            ui.add_enabled(!s.voice.auto_sensitivity, egui::Slider::new(&mut s.voice.vad_threshold_db, -100.0..=0.0).suffix(" dB").text("Sensitivity"));
+            ui.add_enabled(
+                !s.voice.auto_sensitivity,
+                egui::Slider::new(&mut s.voice.vad_threshold_db, -100.0..=0.0).suffix(" dB").text("Sensitivity"),
+            );
         }
         InputMode::PushToTalk => {
             ui.horizontal(|ui| {
@@ -350,7 +383,11 @@ fn voice(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, s: &mut Settings,
     widgets::section_label(ui, p, "Voice processing");
     ui.checkbox(&mut s.voice.noise_suppression, "Noise suppression (RNNoise)");
     ui.checkbox(&mut s.voice.auto_gain, "Automatic gain control");
-    ui.label(RichText::new("Echo cancellation is not implemented; use headphones or your OS/device echo cancellation.").size(12.0).color(p.faint));
+    ui.label(
+        RichText::new("Echo cancellation is not implemented; use headphones or your OS/device echo cancellation.")
+            .size(12.0)
+            .color(p.faint),
+    );
     ui.add(egui::Slider::new(&mut s.voice.bitrate_kbps, 8..=128).suffix(" kbps").text("Send bitrate"));
 }
 
@@ -359,7 +396,11 @@ fn level_meter(ui: &mut Ui, p: &Palette, level_db: f32, threshold_db: f32, auto:
     ui.painter().rect_filled(rect, CornerRadius::same(5), p.input);
     let frac = ((level_db + 100.0) / 100.0).clamp(0.0, 1.0);
     let above = level_db > threshold_db;
-    ui.painter().rect_filled(egui::Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height())), CornerRadius::same(5), if above || auto { p.green } else { p.yellow });
+    ui.painter().rect_filled(
+        egui::Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height())),
+        CornerRadius::same(5),
+        if above || auto { p.green } else { p.yellow },
+    );
     if !auto {
         let x = rect.left() + rect.width() * ((threshold_db + 100.0) / 100.0).clamp(0.0, 1.0);
         ui.painter().vline(x, rect.y_range().expand(3.0), egui::Stroke::new(2.0, p.text_strong));
@@ -370,7 +411,14 @@ fn keybind_capture(ui: &mut Ui, p: &Palette, value: &mut String, id: &str) {
     let capture_id = egui::Id::unique(("capture", id));
     let capturing = ui.ctx().data(|d| d.get_temp::<bool>(capture_id)).unwrap_or(false);
     let label = if capturing { "Press a key…".to_string() } else { value.clone() };
-    if ui.add(egui::Button::new(RichText::new(label).monospace()).min_size(vec2(140.0, 28.0)).fill(if capturing { p.red.gamma_multiply(0.4) } else { p.input })).clicked() {
+    if ui
+        .add(egui::Button::new(RichText::new(label).monospace()).min_size(vec2(140.0, 28.0)).fill(if capturing {
+            p.red.gamma_multiply(0.4)
+        } else {
+            p.input
+        }))
+        .clicked()
+    {
         ui.ctx().data_mut(|d| d.insert_temp(capture_id, !capturing));
     }
     if capturing {
@@ -515,35 +563,50 @@ fn diagnostics(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette
     };
     card(ui, p, |ui| {
         widgets::section_label(ui, p, "Process");
-        grid(ui, vec![
-            ("Working set (RSS)", widgets::human_size(sample.rss_bytes)),
-            ("Private memory", widgets::human_size(sample.private_bytes)),
-            ("CPU (all cores)", format!("{:.1}%", sample.cpu_percent)),
-            ("Threads", sample.threads.to_string()),
-        ]);
+        grid(
+            ui,
+            vec![
+                ("Working set (RSS)", widgets::human_size(sample.rss_bytes)),
+                ("Private memory", widgets::human_size(sample.private_bytes)),
+                ("CPU (all cores)", format!("{:.1}%", sample.cpu_percent)),
+                ("Threads", sample.threads.to_string()),
+            ],
+        );
     });
     card(ui, p, |ui| {
         widgets::section_label(ui, p, "UI frame build time (CPU; no frames are drawn while idle)");
-        grid(ui, vec![
-            ("Average per frame", format!("{:.2} ms", fs.avg_ms)),
-            ("p95 / p99 / max", format!("{:.2} / {:.2} / {:.2} ms", fs.p95_ms, fs.p99_ms, fs.max_ms)),
-            ("CPU-bound FPS ceiling", format!("{:.0}", fs.fps)),
-            ("GPU textures", format!("{tex_n} ({})", widgets::human_size(tex_b as u64))),
-        ]);
+        grid(
+            ui,
+            vec![
+                ("Average per frame", format!("{:.2} ms", fs.avg_ms)),
+                ("p95 / p99 / max", format!("{:.2} / {:.2} / {:.2} ms", fs.p95_ms, fs.p99_ms, fs.max_ms)),
+                ("CPU-bound FPS ceiling", format!("{:.0}", fs.fps)),
+                ("GPU textures", format!("{tex_n} ({})", widgets::human_size(tex_b as u64))),
+            ],
+        );
     });
     card(ui, p, |ui| {
         widgets::section_label(ui, p, "Client state");
-        grid(ui, vec![
-            ("Gateway", crate::sidebar::conn_label(store)),
-            ("Servers / channels", format!("{} / {}", store.guilds.len(), store.channels.len())),
-            ("Cached users", store.users.len().to_string()),
-            ("Messages in memory", store.total_loaded_messages().to_string()),
-            ("Loaded channel windows", store.messages.len().to_string()),
-        ]);
+        grid(
+            ui,
+            vec![
+                ("Gateway", crate::sidebar::conn_label(store)),
+                ("Servers / channels", format!("{} / {}", store.guilds.len(), store.channels.len())),
+                ("Cached users", store.users.len().to_string()),
+                ("Messages in memory", store.total_loaded_messages().to_string()),
+                ("Loaded channel windows", store.messages.len().to_string()),
+            ],
+        );
     });
     ui.add_space(8.0);
     widgets::section_label(ui, p, "UI stress test");
-    ui.label(RichText::new("Renders synthetic messages offline (no Discord traffic) and auto-scrolls to measure frame times of the virtualized list.").color(p.muted).size(12.5));
+    ui.label(
+        RichText::new(
+            "Renders synthetic messages offline (no Discord traffic) and auto-scrolls to measure frame times of the virtualized list.",
+        )
+        .color(p.muted)
+        .size(12.5),
+    );
     ui.horizontal(|ui| {
         for n in [10_000usize, 50_000, 100_000] {
             if ui.button(format!("Run with {n} messages")).clicked() {
@@ -557,7 +620,10 @@ fn diagnostics(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette
 
 fn about(ui: &mut Ui, p: &Palette) {
     title(ui, p, "About & Compatibility");
-    ui.label(format!("Discord Native {} — native Rust client (egui + wgpu). Not affiliated with or endorsed by Discord Inc.", env!("CARGO_PKG_VERSION")));
+    ui.label(format!(
+        "Discord Native {} — native Rust client (egui + wgpu). Not affiliated with or endorsed by Discord Inc.",
+        env!("CARGO_PKG_VERSION")
+    ));
     ui.label(RichText::new("A complete replacement for the official client is not achievable with Discord's authorized interfaces: personal-account chat, personal DMs, friends and video/screen sharing are not available to third-party apps.").color(p.yellow));
     ui.add_space(8.0);
     egui::Grid::new("matrix").num_columns(3).striped(true).spacing(vec2(16.0, 6.0)).show(ui, |ui| {

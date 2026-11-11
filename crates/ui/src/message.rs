@@ -111,10 +111,9 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, rc: &
                 ui.horizontal(|ui| {
                     let color = p.role_color(store.member_color(rc.guild_id, m.author.id));
                     let name = match rc.guild_id {
-                        Some(g) => store
-                            .member(g, m.author.id)
-                            .and_then(|mm| mm.nick.clone())
-                            .unwrap_or_else(|| m.author_name().to_string()),
+                        Some(g) => {
+                            store.member(g, m.author.id).and_then(|mm| mm.nick.clone()).unwrap_or_else(|| m.author_name().to_string())
+                        }
                         None => m.author_name().to_string(),
                     };
                     let nr = ui.add(egui::Label::new(RichText::new(name).color(color).strong()).sense(Sense::click()).selectable(false));
@@ -223,7 +222,17 @@ pub fn handle_action(app: &mut DiscordApp, _ui: &Ui, store: &Store, a: RichActio
 }
 
 #[allow(clippy::too_many_arguments)]
-fn content(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, rc: &RowCtx, p: &Palette, font_size: f32, use_24h: bool, actions: &mut Vec<RichAction>) {
+fn content(
+    app: &mut DiscordApp,
+    ui: &mut Ui,
+    store: &Store,
+    m: &Message,
+    rc: &RowCtx,
+    p: &Palette,
+    font_size: f32,
+    use_24h: bool,
+    actions: &mut Vec<RichAction>,
+) {
     if let Some((id, text)) = app.st.editing.clone().filter(|(id, _)| *id == m.id) {
         let mut text = text;
         let out = egui::TextEdit::multiline(&mut text).desired_rows(1).desired_width(f32::INFINITY).id_salt(("edit", id)).show(ui);
@@ -275,7 +284,9 @@ pub fn plain_snippet(store: &Store, guild: Option<Id>, content: &str, max_chars:
     let resolve = |inl: &Inline| -> Option<String> {
         match inl {
             Inline::UserMention(id) => Some(format!("@{}", store.display_name(guild, *id))),
-            Inline::ChannelMention(id) => Some(format!("#{}", store.channels.get(id).map(|c| c.display_name()).unwrap_or_else(|| "unknown".into()))),
+            Inline::ChannelMention(id) => {
+                Some(format!("#{}", store.channels.get(id).map(|c| c.display_name()).unwrap_or_else(|| "unknown".into())))
+            }
             Inline::RoleMention(id) => Some(format!(
                 "@{}",
                 guild.and_then(|g| store.guilds.get(&g)).and_then(|g| g.role(*id)).map(|r| r.name.clone()).unwrap_or_else(|| "role".into())
@@ -385,24 +396,33 @@ fn image_attachment(app: &mut DiscordApp, ui: &mut Ui, m: &Message, idx: usize, 
 }
 
 fn file_card(app: &mut DiscordApp, ui: &mut Ui, a: &Attachment, p: &Palette) {
-    egui::Frame::new().fill(p.embed_bg).stroke(Stroke::new(1.0, p.divider)).corner_radius(CornerRadius::same(6)).inner_margin(10).show(ui, |ui| {
-        ui.set_max_width(420.0);
-        ui.horizontal(|ui| {
-            let icon = if a.is_video() { "🎞" } else if a.content_type.as_deref().is_some_and(|c| c.starts_with("audio/")) { "🎵" } else { "📄" };
-            ui.label(RichText::new(icon).size(24.0));
-            ui.vertical(|ui| {
-                if ui.link(RichText::new(&a.filename).color(p.link)).clicked() {
-                    let _ = open::that_detached(&a.url);
-                }
-                ui.label(RichText::new(widgets::human_size(a.size)).color(p.faint).size(11.5));
+    egui::Frame::new().fill(p.embed_bg).stroke(Stroke::new(1.0, p.divider)).corner_radius(CornerRadius::same(6)).inner_margin(10).show(
+        ui,
+        |ui| {
+            ui.set_max_width(420.0);
+            ui.horizontal(|ui| {
+                let icon = if a.is_video() {
+                    "🎞"
+                } else if a.content_type.as_deref().is_some_and(|c| c.starts_with("audio/")) {
+                    "🎵"
+                } else {
+                    "📄"
+                };
+                ui.label(RichText::new(icon).size(24.0));
+                ui.vertical(|ui| {
+                    if ui.link(RichText::new(&a.filename).color(p.link)).clicked() {
+                        let _ = open::that_detached(&a.url);
+                    }
+                    ui.label(RichText::new(widgets::human_size(a.size)).color(p.faint).size(11.5));
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if widgets::icon_button(ui, p, "⬇", "Download", None).clicked() {
+                        save_as(app, &a.url, &a.filename);
+                    }
+                });
             });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if widgets::icon_button(ui, p, "⬇", "Download", None).clicked() {
-                    save_as(app, &a.url, &a.filename);
-                }
-            });
-        });
-    });
+        },
+    );
 }
 
 pub fn save_as(app: &mut DiscordApp, url: &str, filename: &str) {
@@ -418,30 +438,43 @@ pub fn save_as(app: &mut DiscordApp, url: &str, filename: &str) {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn embed(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, idx: usize, e: &Embed, p: &Palette, font_size: f32, use_24h: bool, actions: &mut Vec<RichAction>) {
+fn embed(
+    app: &mut DiscordApp,
+    ui: &mut Ui,
+    store: &Store,
+    m: &Message,
+    idx: usize,
+    e: &Embed,
+    p: &Palette,
+    font_size: f32,
+    use_24h: bool,
+    actions: &mut Vec<RichAction>,
+) {
     let kind = e.kind.as_deref().unwrap_or("rich");
     // Media-only embeds (image/gifv) render as a plain image like attachments.
     if matches!(kind, "image" | "gifv")
-        && let Some(t) = e.thumbnail.as_ref().or(e.image.as_ref()) {
-            let size = fit(t.width, t.height, ui.available_width().min(400.0), 300.0);
-            let src = t.proxy_url.clone().unwrap_or_else(|| t.url.clone());
-            let url = dn_core::cdn::with_size_params(&src, t.width, t.height, size.x as u32 * 2, size.y as u32 * 2);
-            let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
-            match app.textures.get(&url, (size.x.max(size.y) * 2.0) as u32) {
-                Some(tex) => egui::Image::new((tex.id(), size)).corner_radius(CornerRadius::same(6)).paint_at(ui, rect),
-                None => {
-                    ui.painter().rect_filled(rect, CornerRadius::same(6), p.embed_bg);
-                }
+        && let Some(t) = e.thumbnail.as_ref().or(e.image.as_ref())
+    {
+        let size = fit(t.width, t.height, ui.available_width().min(400.0), 300.0);
+        let src = t.proxy_url.clone().unwrap_or_else(|| t.url.clone());
+        let url = dn_core::cdn::with_size_params(&src, t.width, t.height, size.x as u32 * 2, size.y as u32 * 2);
+        let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+        match app.textures.get(&url, (size.x.max(size.y) * 2.0) as u32) {
+            Some(tex) => egui::Image::new((tex.id(), size)).corner_radius(CornerRadius::same(6)).paint_at(ui, rect),
+            None => {
+                ui.painter().rect_filled(rect, CornerRadius::same(6), p.embed_bg);
             }
-            if kind == "gifv" {
-                ui.painter().text(rect.left_top() + vec2(6.0, 6.0), egui::Align2::LEFT_TOP, "GIF", crate::theme::bold(11.0), Color32::WHITE);
-            }
-            if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked()
-                && let Some(u) = &e.url {
-                    let _ = open::that_detached(u);
-                }
-            return;
         }
+        if kind == "gifv" {
+            ui.painter().text(rect.left_top() + vec2(6.0, 6.0), egui::Align2::LEFT_TOP, "GIF", crate::theme::bold(11.0), Color32::WHITE);
+        }
+        if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked()
+            && let Some(u) = &e.url
+        {
+            let _ = open::that_detached(u);
+        }
+        return;
+    }
     let bar = e.color.map(rgb).unwrap_or(p.divider);
     let resp = egui::Frame::new()
         .fill(p.embed_bg)
@@ -472,14 +505,16 @@ fn embed(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, idx: usi
                     if let Some(a) = &e.author {
                         ui.horizontal(|ui| {
                             if let Some(icon) = &a.icon_url
-                                && let Some(tex) = rctx.textures.get(icon, 48) {
-                                    ui.add(egui::Image::new((tex.id(), vec2(20.0, 20.0))).corner_radius(CornerRadius::same(10)));
-                                }
+                                && let Some(tex) = rctx.textures.get(icon, 48)
+                            {
+                                ui.add(egui::Image::new((tex.id(), vec2(20.0, 20.0))).corner_radius(CornerRadius::same(10)));
+                            }
                             let r = ui.add(egui::Label::new(RichText::new(&a.name).strong().size(13.0)).sense(Sense::click()));
                             if r.clicked()
-                                && let Some(u) = &a.url {
-                                    rctx.actions.push(RichAction::OpenUrl { url: u.clone(), masked: false });
-                                }
+                                && let Some(u) = &a.url
+                            {
+                                rctx.actions.push(RichAction::OpenUrl { url: u.clone(), masked: false });
+                            }
                         });
                     }
                     if let Some(t) = &e.title {
@@ -544,15 +579,16 @@ fn embed(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, idx: usi
                     }
                 });
                 if kind != "image"
-                    && let Some(t) = &e.thumbnail {
-                        let size = fit(t.width, t.height, 80.0, 80.0);
-                        let src = t.proxy_url.clone().unwrap_or_else(|| t.url.clone());
-                        let url = dn_core::cdn::with_size_params(&src, t.width, t.height, 160, 160);
-                        let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
-                        if let Some(tex) = rctx.textures.get(&url, 160) {
-                            egui::Image::new((tex.id(), size)).corner_radius(CornerRadius::same(4)).paint_at(ui, rect);
-                        }
+                    && let Some(t) = &e.thumbnail
+                {
+                    let size = fit(t.width, t.height, 80.0, 80.0);
+                    let src = t.proxy_url.clone().unwrap_or_else(|| t.url.clone());
+                    let url = dn_core::cdn::with_size_params(&src, t.width, t.height, 160, 160);
+                    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+                    if let Some(tex) = rctx.textures.get(&url, 160) {
+                        egui::Image::new((tex.id(), size)).corner_radius(CornerRadius::same(4)).paint_at(ui, rect);
                     }
+                }
             });
         });
     let r = resp.response.rect;
@@ -574,7 +610,9 @@ fn stickers(app: &mut DiscordApp, ui: &mut Ui, m: &Message, p: &Palette) {
                 resp.on_hover_text(&s.name);
             }
             None => {
-                ui.label(RichText::new(format!("[Sticker: {}] (animated Lottie stickers aren't rendered)", s.name)).color(p.muted).italics());
+                ui.label(
+                    RichText::new(format!("[Sticker: {}] (animated Lottie stickers aren't rendered)", s.name)).color(p.muted).italics(),
+                );
             }
         }
     }
@@ -591,12 +629,36 @@ fn poll_view(ui: &mut Ui, poll: &dn_core::Poll, p: &Palette) {
             let frac = c as f32 / total as f32;
             let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 28.0), Sense::hover());
             ui.painter().rect_filled(rect, CornerRadius::same(4), p.hover);
-            ui.painter().rect_filled(Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height())), CornerRadius::same(4), p.accent.gamma_multiply(0.4));
-            let label = format!("{} {}", a.poll_media.emoji.as_ref().and_then(|e| e.name.clone()).unwrap_or_default(), a.poll_media.text.clone().unwrap_or_default());
-            ui.painter().text(rect.left_center() + vec2(8.0, 0.0), egui::Align2::LEFT_CENTER, label.trim(), egui::FontId::proportional(13.0), p.text);
-            ui.painter().text(rect.right_center() - vec2(8.0, 0.0), egui::Align2::RIGHT_CENTER, format!("{c}"), egui::FontId::proportional(12.0), p.muted);
+            ui.painter().rect_filled(
+                Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height())),
+                CornerRadius::same(4),
+                p.accent.gamma_multiply(0.4),
+            );
+            let label = format!(
+                "{} {}",
+                a.poll_media.emoji.as_ref().and_then(|e| e.name.clone()).unwrap_or_default(),
+                a.poll_media.text.clone().unwrap_or_default()
+            );
+            ui.painter().text(
+                rect.left_center() + vec2(8.0, 0.0),
+                egui::Align2::LEFT_CENTER,
+                label.trim(),
+                egui::FontId::proportional(13.0),
+                p.text,
+            );
+            ui.painter().text(
+                rect.right_center() - vec2(8.0, 0.0),
+                egui::Align2::RIGHT_CENTER,
+                format!("{c}"),
+                egui::FontId::proportional(12.0),
+                p.muted,
+            );
         }
-        let status = if poll.results.as_ref().is_some_and(|r| r.is_finalized) { "Final results" } else { "Bots can't vote; vote from an official client" };
+        let status = if poll.results.as_ref().is_some_and(|r| r.is_finalized) {
+            "Final results"
+        } else {
+            "Bots can't vote; vote from an official client"
+        };
         ui.label(RichText::new(status).size(11.0).color(p.faint));
     });
 }
@@ -651,7 +713,8 @@ fn toolbar(app: &mut DiscordApp, ui: &mut Ui, m: &Message, rc: &RowCtx, row: Rec
     let w = n as f32 * 32.0 + 8.0;
     let rect = Rect::from_min_size(egui::pos2(row.right() - w - 16.0, row.top() - 14.0), vec2(w, 34.0));
     ui.painter().rect(rect, CornerRadius::same(6), p.chat, Stroke::new(1.0, p.divider), egui::StrokeKind::Inside);
-    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(1.0)).layout(egui::Layout::left_to_right(egui::Align::Center)));
+    let mut child =
+        ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(1.0)).layout(egui::Layout::left_to_right(egui::Align::Center)));
     child.spacing_mut().item_spacing.x = 0.0;
     child.add_space(3.0);
     if rc.perms.contains(Permissions::ADD_REACTIONS) && widgets::icon_button(&mut child, p, "☺", "Add reaction", None).clicked() {
@@ -697,9 +760,18 @@ fn context_menu(app: &mut DiscordApp, ui: &mut Ui, store: &Store, m: &Message, r
         }
     }
     let channel_is_thread = store.channels.get(&m.channel_id).is_some_and(|c| c.kind.is_thread());
-    if m.guild_id.is_some() && !channel_is_thread && m.thread.is_none() && rc.perms.contains(Permissions::CREATE_PUBLIC_THREADS) && ui.button("🧵  Create Thread").clicked() {
+    if m.guild_id.is_some()
+        && !channel_is_thread
+        && m.thread.is_none()
+        && rc.perms.contains(Permissions::CREATE_PUBLIC_THREADS)
+        && ui.button("🧵  Create Thread").clicked()
+    {
         let name: String = m.content.chars().take(40).collect();
-        app.st.modal = Some(Modal::CreateThread { channel_id: m.channel_id, message_id: m.id, name: if name.is_empty() { "New Thread".into() } else { name } });
+        app.st.modal = Some(Modal::CreateThread {
+            channel_id: m.channel_id,
+            message_id: m.id,
+            name: if name.is_empty() { "New Thread".into() } else { name },
+        });
         ui.close();
     }
     if ui.button("⧉  Copy Text").clicked() {

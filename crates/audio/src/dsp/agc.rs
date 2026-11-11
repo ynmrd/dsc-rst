@@ -18,18 +18,12 @@ impl AutoSensitivity {
     const FALL_COEFF: f32 = 0.25;
 
     pub fn new() -> Self {
-        Self {
-            floor_db: Self::INITIAL_FLOOR_DB,
-        }
+        Self { floor_db: Self::INITIAL_FLOOR_DB }
     }
 
     /// Feeds one frame level and returns the updated threshold.
     pub fn update(&mut self, level_db: f32) -> f32 {
-        let level = if level_db.is_nan() {
-            SILENCE_DB
-        } else {
-            level_db.max(SILENCE_DB)
-        };
+        let level = if level_db.is_nan() { SILENCE_DB } else { level_db.max(SILENCE_DB) };
         if level < self.floor_db {
             self.floor_db += (level - self.floor_db) * Self::FALL_COEFF;
         } else {
@@ -73,11 +67,7 @@ impl AutoGain {
     const CEILING: f32 = 0.98;
 
     pub fn new() -> Self {
-        Self {
-            gain_db: 0.0,
-            target_db: Self::DEFAULT_TARGET_DB,
-            max_gain_db: Self::DEFAULT_MAX_GAIN_DB,
-        }
+        Self { gain_db: 0.0, target_db: Self::DEFAULT_TARGET_DB, max_gain_db: Self::DEFAULT_MAX_GAIN_DB }
     }
 
     pub fn with_target_db(mut self, target_db: f32) -> Self {
@@ -120,11 +110,7 @@ impl AutoGain {
             end = Self::CEILING / peak;
             self.gain_db = linear_to_db(end);
         }
-        let start = if peak * start > Self::CEILING {
-            end
-        } else {
-            start
-        };
+        let start = if peak * start > Self::CEILING { end } else { start };
 
         let n = frame.len() as f32;
         for (i, s) in frame.iter_mut().enumerate() {
@@ -156,18 +142,11 @@ mod tests {
         let mut threshold = 0.0;
         for (i, frame) in noise.as_chunks::<FRAME_SAMPLES>().0.iter().enumerate() {
             // A 400 ms burst of "speech" every 2 s.
-            let level = if i % 100 < 20 {
-                rms_db(&speech)
-            } else {
-                rms_db(frame)
-            };
+            let level = if i % 100 < 20 { rms_db(&speech) } else { rms_db(frame) };
             threshold = sens.update(level);
         }
         let expected = noise_db + AutoSensitivity::MARGIN_DB;
-        assert!(
-            (threshold - expected).abs() < 3.0,
-            "threshold {threshold} vs expected {expected} (noise {noise_db})"
-        );
+        assert!((threshold - expected).abs() < 3.0, "threshold {threshold} vs expected {expected} (noise {noise_db})");
     }
 
     #[test]

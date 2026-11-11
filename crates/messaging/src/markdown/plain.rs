@@ -18,28 +18,15 @@ fn write_blocks(blocks: &[Block], resolve: Resolve, out: &mut String) {
     for block in blocks {
         newline(out);
         match block {
-            Block::Paragraph(i) | Block::Subtext(i) | Block::Heading { content: i, .. } => {
-                write_inlines(i, resolve, out)
-            }
+            Block::Paragraph(i) | Block::Subtext(i) | Block::Heading { content: i, .. } => write_inlines(i, resolve, out),
             Block::CodeBlock { code, .. } => out.push_str(code),
             Block::Quote(children) => write_blocks(children, resolve, out),
-            Block::List {
-                ordered,
-                start,
-                items,
-            } => write_list(*ordered, *start, items, 0, resolve, out),
+            Block::List { ordered, start, items } => write_list(*ordered, *start, items, 0, resolve, out),
         }
     }
 }
 
-fn write_list(
-    ordered: bool,
-    start: u32,
-    items: &[Vec<Block>],
-    indent: usize,
-    resolve: Resolve,
-    out: &mut String,
-) {
+fn write_list(ordered: bool, start: u32, items: &[Vec<Block>], indent: usize, resolve: Resolve, out: &mut String) {
     for (k, item) in items.iter().enumerate() {
         newline(out);
         out.extend(std::iter::repeat_n(' ', indent));
@@ -52,11 +39,7 @@ fn write_list(
         for block in item {
             match block {
                 Block::Paragraph(i) => write_inlines(i, resolve, out),
-                Block::List {
-                    ordered,
-                    start,
-                    items,
-                } => write_list(*ordered, *start, items, indent + 2, resolve, out),
+                Block::List { ordered, start, items } => write_list(*ordered, *start, items, indent + 2, resolve, out),
                 other => write_blocks(std::slice::from_ref(other), resolve, out),
             }
         }
@@ -67,9 +50,7 @@ fn write_inlines(inlines: &[Inline], resolve: Resolve, out: &mut String) {
     for inline in inlines {
         match inline {
             Inline::Text(t) | Inline::Code(t) | Inline::AutoLink(t) => out.push_str(t),
-            Inline::Bold(c) | Inline::Italic(c) | Inline::Underline(c) | Inline::Strike(c) => {
-                write_inlines(c, resolve, out)
-            }
+            Inline::Bold(c) | Inline::Italic(c) | Inline::Underline(c) | Inline::Strike(c) => write_inlines(c, resolve, out),
             Inline::Link { text, .. } => write_inlines(text, resolve, out),
             Inline::Spoiler(_) => out.push_str("[spoiler]"),
             Inline::LineBreak => out.push('\n'),

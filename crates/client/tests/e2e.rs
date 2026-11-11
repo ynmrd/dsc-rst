@@ -128,7 +128,11 @@ async fn mock_rest(bot: bool) -> MockServer {
         .await;
     Mock::given(method("GET"))
         .and(path(format!("/channels/{CHANNEL}/messages")))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!([msg_json(3, "2", "third"), msg_json(2, "2", "second"), msg_json(1, "2", "first")])))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+            msg_json(3, "2", "third"),
+            msg_json(2, "2", "second"),
+            msg_json(1, "2", "first")
+        ])))
         .mount(&server)
         .await;
     Mock::given(method("POST")).and(path(format!("/channels/{CHANNEL}/messages"))).respond_with(EchoCreate).mount(&server).await;
@@ -223,7 +227,8 @@ async fn full_session_against_mock_discord() {
         sticker_ids: vec![],
     });
     wait_for(&h.store, "sent message", |s| {
-        s.channel_messages(Id(CHANNEL)).is_some_and(|cm| cm.get(Id(950)).is_some_and(|m| m.content == "hello from the test") && cm.pending.is_empty())
+        s.channel_messages(Id(CHANNEL))
+            .is_some_and(|cm| cm.get(Id(950)).is_some_and(|m| m.content == "hello from the test") && cm.pending.is_empty())
     })
     .await;
 
@@ -254,7 +259,8 @@ async fn rejected_token_marks_account_invalid() {
     let h = start_backend(&rest.uri(), &gw_url).await;
     h.ui.send(Command::AddBotAccount { token: "test-token".into() });
     wait_for(&h.store, "fatal state", |s| matches!(s.session.conn, ConnStatus::Fatal(_))).await;
-    wait_for(&h.store, "credentials invalid", |s| s.session.accounts.iter().any(|a| a.credentials_invalid) && s.session.needs_onboarding).await;
+    wait_for(&h.store, "credentials invalid", |s| s.session.accounts.iter().any(|a| a.credentials_invalid) && s.session.needs_onboarding)
+        .await;
     h.ui.send(Command::Shutdown);
     tokio::time::timeout(Duration::from_secs(10), h.backend).await.unwrap().unwrap();
 }

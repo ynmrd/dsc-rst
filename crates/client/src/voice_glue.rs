@@ -28,7 +28,9 @@ pub(crate) fn audio_config(s: &Settings) -> dn_audio::AudioConfig {
         input_gain: s.voice.input_volume,
         output_volume: s.voice.output_volume,
         mode: match s.voice.input_mode {
-            InputMode::VoiceActivity => dn_audio::InputMode::VoiceActivity { threshold_db: s.voice.vad_threshold_db, auto: s.voice.auto_sensitivity },
+            InputMode::VoiceActivity => {
+                dn_audio::InputMode::VoiceActivity { threshold_db: s.voice.vad_threshold_db, auto: s.voice.auto_sensitivity }
+            }
             InputMode::PushToTalk => dn_audio::InputMode::PushToTalk { release_delay_ms: s.voice.ptt_release_delay_ms },
         },
         noise_suppression: s.voice.noise_suppression,
@@ -57,14 +59,8 @@ impl Backend {
             return;
         }
         let keep_session = self.voice_pending.as_ref().filter(|p| p.guild_id == guild_id).and_then(|p| p.session_id.clone());
-        self.voice_pending = Some(PendingVoice {
-            guild_id,
-            channel_id,
-            session_id: keep_session,
-            token: None,
-            endpoint: None,
-            connected_with: None,
-        });
+        self.voice_pending =
+            Some(PendingVoice { guild_id, channel_id, session_id: keep_session, token: None, endpoint: None, connected_with: None });
         self.store().voice.conn = VoiceConn::Connecting { guild_id, channel_id };
         self.voice_join_gen += 1;
         let join_gen = self.voice_join_gen;
@@ -200,7 +196,9 @@ impl Backend {
         let mut s = self.store();
         match ev {
             VoiceEvent::State(state) => match (state, target) {
-                (dn_voice::VoiceState::Connected { .. }, Some((g, c))) => s.voice.conn = VoiceConn::Connected { guild_id: g, channel_id: c },
+                (dn_voice::VoiceState::Connected { .. }, Some((g, c))) => {
+                    s.voice.conn = VoiceConn::Connected { guild_id: g, channel_id: c }
+                }
                 (dn_voice::VoiceState::Connecting, Some((g, c))) => s.voice.conn = VoiceConn::Connecting { guild_id: g, channel_id: c },
                 (dn_voice::VoiceState::Reconnecting, Some((g, c))) => s.voice.conn = VoiceConn::Reconnecting { guild_id: g, channel_id: c },
                 (dn_voice::VoiceState::Failed(e), _) => {

@@ -21,8 +21,28 @@ pub struct StressTest {
 }
 
 const WORDS: &[&str] = &[
-    "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog", "**bold**", "_italic_", "`code`", "rust", "native", "egui",
-    "discord", "message", "scrolling", "virtualized", "list", "https://example.com/page", "||spoiler||", "~~strike~~",
+    "the",
+    "quick",
+    "brown",
+    "fox",
+    "jumps",
+    "over",
+    "lazy",
+    "dog",
+    "**bold**",
+    "_italic_",
+    "`code`",
+    "rust",
+    "native",
+    "egui",
+    "discord",
+    "message",
+    "scrolling",
+    "virtualized",
+    "list",
+    "https://example.com/page",
+    "||spoiler||",
+    "~~strike~~",
 ];
 
 impl StressTest {
@@ -57,9 +77,10 @@ impl StressTest {
     pub fn show(&mut self, ui: &mut Ui, p: &Palette) -> bool {
         let now = Instant::now();
         if let Some(prev) = self.last
-            && self.done.is_none() {
-                self.stats.record(now - prev);
-            }
+            && self.done.is_none()
+        {
+            self.stats.record(now - prev);
+        }
         self.last = Some(now);
         let mut keep = true;
         egui::CentralPanel::default().frame(egui::Frame::new().fill(p.chat)).show(ui, |ui| {
@@ -80,19 +101,21 @@ impl StressTest {
             let offs = offsets(heights);
             let total = *offs.last().unwrap_or(&0.0);
             let mut measured = vec![];
-            let out = egui::ScrollArea::vertical().auto_shrink([false, false]).vertical_scroll_offset(self.offset).show_viewport(ui, |ui, vp| {
-                ui.set_min_height(total);
-                let origin = ui.min_rect().min;
-                for i in visible_range(&offs, vp.min.y, vp.max.y) {
-                    let rect = egui::Rect::from_min_size(origin + vec2(0.0, offs[i]), vec2(width, f32::INFINITY));
-                    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Min)));
-                    let (author, text) = &self.messages[i];
-                    child.add_space(6.0);
-                    child.label(RichText::new(author).strong().color(p.text_strong));
-                    child.add(egui::Label::new(RichText::new(text).color(p.text)).wrap());
-                    measured.push((i as u64, child.min_rect().height()));
-                }
-            });
+            let out =
+                egui::ScrollArea::vertical().auto_shrink([false, false]).vertical_scroll_offset(self.offset).show_viewport(ui, |ui, vp| {
+                    ui.set_min_height(total);
+                    let origin = ui.min_rect().min;
+                    for i in visible_range(&offs, vp.min.y, vp.max.y) {
+                        let rect = egui::Rect::from_min_size(origin + vec2(0.0, offs[i]), vec2(width, f32::INFINITY));
+                        let mut child =
+                            ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Min)));
+                        let (author, text) = &self.messages[i];
+                        child.add_space(6.0);
+                        child.label(RichText::new(author).strong().color(p.text_strong));
+                        child.add(egui::Label::new(RichText::new(text).color(p.text)).wrap());
+                        measured.push((i as u64, child.min_rect().height()));
+                    }
+                });
             for (k, h) in measured {
                 self.heights.put(k, 0, h);
             }

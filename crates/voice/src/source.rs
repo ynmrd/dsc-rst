@@ -40,12 +40,7 @@ impl<S: FrameSource> CaptureSource<S> {
     pub const MAX_BACKLOG: usize = 4;
 
     pub fn new(source: S) -> Self {
-        Self {
-            source,
-            frame: [0.0; FRAME_SAMPLES],
-            bytes: Box::new([0; FRAME_BYTES]),
-            pos: FRAME_BYTES,
-        }
+        Self { source, frame: [0.0; FRAME_SAMPLES], bytes: Box::new([0; FRAME_BYTES]), pos: FRAME_BYTES }
     }
 
     fn refill(&mut self) {
@@ -61,13 +56,7 @@ impl<S: FrameSource> CaptureSource<S> {
             }
             break;
         }
-        for (dst, s) in self
-            .bytes
-            .as_chunks_mut::<4>()
-            .0
-            .iter_mut()
-            .zip(self.frame.iter())
-        {
+        for (dst, s) in self.bytes.as_chunks_mut::<4>().0.iter_mut().zip(self.frame.iter()) {
             *dst = s.to_le_bytes();
         }
         self.pos = 0;
@@ -131,10 +120,7 @@ pub(crate) mod tests {
         fn read_frame(&mut self, out: &mut [f32; FRAME_SAMPLES]) -> Option<FrameInfo> {
             let (frame, active) = self.0.pop_front()?;
             *out = frame;
-            Some(FrameInfo {
-                voice_active: active,
-                level_db: -20.0,
-            })
+            Some(FrameInfo { voice_active: active, level_db: -20.0 })
         }
 
         fn available_frames(&self) -> usize {
@@ -151,12 +137,7 @@ pub(crate) mod tests {
             bytes.extend_from_slice(&buf[..n]);
         }
         bytes.truncate(samples * 4);
-        bytes
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .map(|b| f32::from_le_bytes(*b))
-            .collect()
+        bytes.as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)).collect()
     }
 
     #[test]
@@ -193,10 +174,7 @@ pub(crate) mod tests {
         q.push(0.8, true);
         let mut src = CaptureSource::new(q);
         let samples = read_samples(&mut src, FRAME_SAMPLES, FRAME_BYTES);
-        assert!(
-            (samples[0] - 0.7).abs() < 1e-6,
-            "onset frame must be sent first"
-        );
+        assert!((samples[0] - 0.7).abs() < 1e-6, "onset frame must be sent first");
         assert_eq!(src.source.available_frames(), 1);
     }
 
@@ -209,10 +187,7 @@ pub(crate) mod tests {
         let mut src = CaptureSource::new(q);
         let samples = read_samples(&mut src, FRAME_SAMPLES, FRAME_BYTES);
         assert_eq!(samples[0], 4.0);
-        assert_eq!(
-            src.source.available_frames(),
-            CaptureSource::<QueueSource>::MAX_BACKLOG - 1
-        );
+        assert_eq!(src.source.available_frames(), CaptureSource::<QueueSource>::MAX_BACKLOG - 1);
     }
 
     #[tokio::test]
@@ -222,13 +197,8 @@ pub(crate) mod tests {
         let expected = q.0[0].0;
         let input: Input = RawAdapter::new(CaptureSource::new(q), 48_000, 1).into();
         assert!(matches!(input, Input::Live(LiveInput::Raw(_), _)));
-        let mut input = input
-            .make_playable_async(get_codec_registry(), get_probe())
-            .await
-            .unwrap();
-        let Some(parsed) = input.parsed_mut() else {
-            panic!("input is not parsed")
-        };
+        let mut input = input.make_playable_async(get_codec_registry(), get_probe()).await.unwrap();
+        let Some(parsed) = input.parsed_mut() else { panic!("input is not parsed") };
         let params = &parsed.format.default_track().unwrap().codec_params;
         assert_eq!(params.sample_rate, Some(48_000));
         assert_eq!(params.channels.map(|c| c.count()), Some(1));
@@ -236,14 +206,7 @@ pub(crate) mod tests {
         let mut samples = Vec::new();
         while samples.len() < FRAME_SAMPLES {
             let packet = parsed.format.next_packet().unwrap();
-            samples.extend(
-                packet
-                    .buf()
-                    .as_chunks::<4>()
-                    .0
-                    .iter()
-                    .map(|b| f32::from_le_bytes(*b)),
-            );
+            samples.extend(packet.buf().as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)));
         }
         assert_eq!(&samples[..FRAME_SAMPLES], &expected[..]);
         // The stream continues with silence instead of ending.

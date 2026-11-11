@@ -38,11 +38,12 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store) {
     if let Some(gid) = app.st.selected_guild {
         resp.context_menu(|ui| {
             if let Some(app_id) = store.session.application_id
-                && ui.button("Invite the bot to another server").clicked() {
-                    let url = invite_url(app_id, None);
-                    ui.ctx().open_url(egui::OpenUrl::new_tab(url));
-                    ui.close();
-                }
+                && ui.button("Invite the bot to another server").clicked()
+            {
+                let url = invite_url(app_id, None);
+                ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+                ui.close();
+            }
             if app.link.settings.read().behavior.developer_mode && ui.button("Copy server ID").clicked() {
                 ui.ctx().copy_text(gid.to_string());
                 ui.close();
@@ -81,9 +82,14 @@ fn guild_channels(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, guild: I
             let collapsed = app.st.collapsed_categories.contains(cid);
             ui.add_space(12.0);
             let r = ui.add(
-                egui::Label::new(RichText::new(format!("{} {}", if collapsed { "›" } else { "⌄" }, name.to_uppercase())).size(11.5).strong().color(p.muted))
-                    .sense(egui::Sense::click())
-                    .selectable(false),
+                egui::Label::new(
+                    RichText::new(format!("{} {}", if collapsed { "›" } else { "⌄" }, name.to_uppercase()))
+                        .size(11.5)
+                        .strong()
+                        .color(p.muted),
+                )
+                .sense(egui::Sense::click())
+                .selectable(false),
             );
             if r.clicked() {
                 if collapsed {
@@ -94,7 +100,8 @@ fn guild_channels(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, guild: I
             }
             if collapsed {
                 // Collapsed categories still show the selected channel and unread ones.
-                let visible: Vec<Channel> = channels.iter().filter(|c| app.st.selected_channel == Some(c.id) || store.is_unread(c.id)).cloned().collect();
+                let visible: Vec<Channel> =
+                    channels.iter().filter(|c| app.st.selected_channel == Some(c.id) || store.is_unread(c.id)).cloned().collect();
                 for c in &visible {
                     channel_row(app, ui, store, c, p, 0.0);
                 }
@@ -106,11 +113,13 @@ fn guild_channels(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, guild: I
             if c.kind.is_voice() {
                 voice_participants(app, ui, store, guild, c.id, p);
             }
-            let show_threads = app.st.selected_channel.is_some_and(|s| {
-                s == c.id || store.channels.get(&s).is_some_and(|sc| sc.parent_id == Some(c.id) && sc.kind.is_thread())
-            });
+            let show_threads = app
+                .st
+                .selected_channel
+                .is_some_and(|s| s == c.id || store.channels.get(&s).is_some_and(|sc| sc.parent_id == Some(c.id) && sc.kind.is_thread()));
             if show_threads || c.kind.is_forum() {
-                let threads: Vec<Channel> = store.threads_of(c.id).into_iter().take(if c.kind.is_forum() { 8 } else { 6 }).cloned().collect();
+                let threads: Vec<Channel> =
+                    store.threads_of(c.id).into_iter().take(if c.kind.is_forum() { 8 } else { 6 }).cloned().collect();
                 for t in &threads {
                     channel_row(app, ui, store, t, p, 16.0);
                 }
@@ -161,9 +170,10 @@ fn channel_row(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, c: &Channel
     if resp.clicked() {
         if c.kind.is_voice()
             && let Some(g) = c.guild_id
-                && !in_voice {
-                    app.link.send(Command::JoinVoice { guild_id: g, channel_id: c.id });
-                }
+            && !in_voice
+        {
+            app.link.send(Command::JoinVoice { guild_id: g, channel_id: c.id });
+        }
         app.open_channel(store, c.id);
     }
     let topic = c.topic.clone();
@@ -179,16 +189,18 @@ fn channel_row(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, c: &Channel
                     ui.close();
                 }
             } else if let Some(g) = c.guild_id
-                && ui.button("Join voice").clicked() {
-                    app.link.send(Command::JoinVoice { guild_id: g, channel_id: c.id });
-                    ui.close();
-                }
-        }
-        if let Some(last) = c.last_message_id
-            && ui.button("Mark as read").clicked() {
-                app.link.send(Command::MarkRead { channel_id: c.id, message_id: last });
+                && ui.button("Join voice").clicked()
+            {
+                app.link.send(Command::JoinVoice { guild_id: g, channel_id: c.id });
                 ui.close();
             }
+        }
+        if let Some(last) = c.last_message_id
+            && ui.button("Mark as read").clicked()
+        {
+            app.link.send(Command::MarkRead { channel_id: c.id, message_id: last });
+            ui.close();
+        }
         let label = if muted { "Unmute channel" } else { "Mute channel" };
         if ui.button(label).clicked() {
             {
@@ -224,7 +236,11 @@ fn voice_participants(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, guil
         let resp = widgets::nav_row(ui, p, false, 28.0, |ui, _| {
             ui.add_space(24.0);
             widgets::avatar(ui, &mut app.textures, p, &url, 22.0, None, speaking);
-            ui.add(egui::Label::new(RichText::new(&name).color(if speaking { p.text_strong } else { p.muted }).size(13.5)).truncate().selectable(false));
+            ui.add(
+                egui::Label::new(RichText::new(&name).color(if speaking { p.text_strong } else { p.muted }).size(13.5))
+                    .truncate()
+                    .selectable(false),
+            );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if deaf {
                     ui.label(RichText::new("🔇").color(p.red).size(12.0)).on_hover_text("Deafened");
@@ -323,9 +339,10 @@ fn voice_panel(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette
                     app.link.send(Command::LeaveVoice);
                 }
                 if let Some(c) = channel
-                    && widgets::icon_button(ui, p, "💬", "Open voice channel chat", None).clicked() {
-                        app.open_channel(store, c);
-                    }
+                    && widgets::icon_button(ui, p, "💬", "Open voice channel chat", None).clicked()
+                {
+                    app.open_channel(store, c);
+                }
             });
         });
     });
@@ -345,7 +362,15 @@ fn user_panel(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette)
             let status = app.link.settings.read().behavior.developer_mode;
             let _ = status;
             let my_status = store.status_of(me.id);
-            let r = widgets::avatar(ui, &mut app.textures, p, &me.avatar_url(64), 32.0, Some(my_status_or_online(my_status)), store.voice.self_speaking);
+            let r = widgets::avatar(
+                ui,
+                &mut app.textures,
+                p,
+                &me.avatar_url(64),
+                32.0,
+                Some(my_status_or_online(my_status)),
+                store.voice.self_speaking,
+            );
             if r.on_hover_text("Set status").clicked() {
                 app.st.modal = Some(Modal::Status { custom: String::new() });
             }

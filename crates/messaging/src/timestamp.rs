@@ -57,11 +57,7 @@ fn relative(unix: i64, now: i64) -> String {
     } else {
         plural(secs / (365 * 86_400), "year")
     };
-    if delta > 0 {
-        format!("in {phrase}")
-    } else {
-        format!("{phrase} ago")
-    }
+    if delta > 0 { format!("in {phrase}") } else { format!("{phrase} ago") }
 }
 
 fn plural(n: u64, unit: &str) -> String {
@@ -89,10 +85,7 @@ mod tests {
         assert_eq!(format_in(&utc, T, 'd', 0, true), "04/20/2021");
         assert_eq!(format_in(&utc, T, 'D', 0, true), "April 20, 2021");
         assert_eq!(format_in(&utc, T, 'f', 0, true), "April 20, 2021 16:20");
-        assert_eq!(
-            format_in(&utc, T, 'F', 0, true),
-            "Tuesday, April 20, 2021 16:20"
-        );
+        assert_eq!(format_in(&utc, T, 'F', 0, true), "Tuesday, April 20, 2021 16:20");
     }
 
     #[test]
@@ -125,10 +118,7 @@ mod tests {
         assert_eq!(format(now - 30 * 86_400, 'R', now, true), "a month ago");
         assert_eq!(format(now + 90 * 86_400, 'R', now, true), "in 3 months");
         assert_eq!(format(now - 365 * 86_400, 'R', now, true), "a year ago");
-        assert_eq!(
-            format(now - 3 * 365 * 86_400, 'R', now, true),
-            "3 years ago"
-        );
+        assert_eq!(format(now - 3 * 365 * 86_400, 'R', now, true), "3 years ago");
     }
 
     #[test]

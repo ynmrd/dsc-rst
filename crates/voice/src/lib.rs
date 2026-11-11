@@ -62,18 +62,13 @@ impl fmt::Debug for VoiceConnectInfo {
 
 impl VoiceConnectInfo {
     fn to_songbird(&self) -> Result<ConnectionInfo, VoiceError> {
-        let id = |id: Id, what: &str| {
-            NonZeroU64::new(id.0)
-                .ok_or_else(|| VoiceError::Connection(format!("{what} id must not be zero")))
-        };
+        let id = |id: Id, what: &str| NonZeroU64::new(id.0).ok_or_else(|| VoiceError::Connection(format!("{what} id must not be zero")));
         let endpoint = normalize_endpoint(&self.endpoint);
         if endpoint.is_empty() {
             return Err(VoiceError::Connection("voice endpoint is empty".into()));
         }
         if self.session_id.is_empty() || self.token.is_empty() {
-            return Err(VoiceError::Connection(
-                "voice session id or token is empty".into(),
-            ));
+            return Err(VoiceError::Connection("voice session id or token is empty".into()));
         }
         Ok(ConnectionInfo {
             channel_id: id(self.channel_id, "channel")?.into(),
@@ -224,15 +219,8 @@ impl VoiceManager {
 
         let generation = inner.generation.fetch_add(1, SeqCst) + 1;
         *inner.session.lock() = Some(info);
-        let moving = matches!(
-            *inner.state.lock(),
-            VoiceState::Connected { .. } | VoiceState::Reconnecting
-        );
-        inner.set_state(if moving {
-            VoiceState::Reconnecting
-        } else {
-            VoiceState::Connecting
-        });
+        let moving = matches!(*inner.state.lock(), VoiceState::Connected { .. } | VoiceState::Reconnecting);
+        inner.set_state(if moving { VoiceState::Reconnecting } else { VoiceState::Connecting });
         inner.audio.start_capture();
         inner.audio.start_playback();
         self.ensure_gate_task(&handle);
@@ -290,11 +278,7 @@ impl VoiceManager {
 
     /// Local playback volume for one user, linear `0.0..=2.0`.
     pub fn set_user_volume(&self, user: Id, volume: f32) {
-        let volume = if volume.is_finite() {
-            volume.clamp(0.0, 2.0)
-        } else {
-            1.0
-        };
+        let volume = if volume.is_finite() { volume.clamp(0.0, 2.0) } else { 1.0 };
         self.inner.user_volumes.write().insert(user, volume);
     }
 
@@ -341,10 +325,7 @@ impl Inner {
     }
 
     fn new_driver(self: &Arc<Self>) -> DriverSlot {
-        let config = Config::default().decode_mode(DecodeMode::Decode(DecodeConfig::new(
-            Channels::Stereo,
-            SampleRate::Hz48000,
-        )));
+        let config = Config::default().decode_mode(DecodeMode::Decode(DecodeConfig::new(Channels::Stereo, SampleRate::Hz48000)));
         let mut driver = Driver::new(config);
         let handler = Handler(Arc::downgrade(self));
         for event in [
@@ -359,33 +340,19 @@ impl Inner {
         }
         driver.set_bitrate(bitrate(self.bitrate_kbps.load(SeqCst)));
         driver.mute(self.send_blocked());
-        DriverSlot {
-            driver,
-            track: None,
-            track_playing: false,
-        }
+        DriverSlot { driver, track: None, track_playing: false }
     }
 
     /// Adds the (paused) microphone track if the driver has none.
     fn ensure_track(&self, slot: &mut DriverSlot) {
         if slot.track.is_none() {
-            slot.track = Some(
-                slot.driver
-                    .play(Track::new(self.microphone_input()).pause()),
-            );
+            slot.track = Some(slot.driver.play(Track::new(self.microphone_input()).pause()));
             slot.track_playing = false;
         }
     }
 
     fn microphone_input(&self) -> Input {
-        let raw = || -> Input {
-            RawAdapter::new(
-                CaptureSource::new(self.audio.capture_frames()),
-                SAMPLE_RATE,
-                1,
-            )
-            .into()
-        };
+        let raw = || -> Input { RawAdapter::new(CaptureSource::new(self.audio.capture_frames()), SAMPLE_RATE, 1).into() };
         // Parse now: songbird would otherwise probe the input on its first play, dropping the
         // start of the first thing the user says.
         let Ok(handle) = tokio::runtime::Handle::try_current() else {
@@ -413,9 +380,7 @@ impl Inner {
     }
 
     fn should_send(&self) -> bool {
-        matches!(*self.state.lock(), VoiceState::Connected { .. })
-            && !self.send_blocked()
-            && self.audio.voice_active()
+        matches!(*self.state.lock(), VoiceState::Connected { .. }) && !self.send_blocked() && self.audio.voice_active()
     }
 
     /// Plays or pauses the microphone track; pausing makes songbird send its trailing silence
@@ -426,10 +391,7 @@ impl Inner {
         if slot.track.is_none() || slot.track_playing == playing {
             return;
         }
-        let result = slot
-            .track
-            .as_ref()
-            .map(|t| if playing { t.play() } else { t.pause() });
+        let result = slot.track.as_ref().map(|t| if playing { t.play() } else { t.pause() });
         if matches!(result, Some(Err(_))) {
             // The mixer dropped the track (e.g. after an input error); start a fresh one.
             tracing::warn!("microphone track ended unexpectedly; recreating it");
@@ -454,10 +416,7 @@ impl Inner {
             rx.speaking.clear()
         };
         for user_id in stopped {
-            self.emit(VoiceEvent::Speaking {
-                user_id,
-                speaking: false,
-            });
+            self.emit(VoiceEvent::Speaking { user_id, speaking: false });
         }
     }
 
@@ -504,10 +463,7 @@ impl Inner {
             rx.speaking.remove(user_id)
         };
         if was_speaking {
-            self.emit(VoiceEvent::Speaking {
-                user_id,
-                speaking: false,
-            });
+            self.emit(VoiceEvent::Speaking { user_id, speaking: false });
         }
         self.emit(VoiceEvent::UserLeft { user_id });
     }
@@ -519,12 +475,7 @@ impl Inner {
         let changes = {
             let volumes = self.user_volumes.read();
             let mut rx = self.rx.lock();
-            let ReceiveState {
-                ssrcs,
-                speaking,
-                mix,
-                writer,
-            } = &mut *rx;
+            let ReceiveState { ssrcs, speaking, mix, writer } = &mut *rx;
             let mut heard = Vec::new();
             let mut sources = Vec::new();
             for (ssrc, pcm) in decoded {
@@ -592,11 +543,9 @@ impl EventHandler for Handler {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         let inner = self.0.upgrade()?;
         match ctx {
-            EventContext::VoiceTick(tick) => inner.on_voice_tick(
-                tick.speaking
-                    .iter()
-                    .filter_map(|(ssrc, data)| Some((*ssrc, data.decoded_voice.as_deref()?))),
-            ),
+            EventContext::VoiceTick(tick) => {
+                inner.on_voice_tick(tick.speaking.iter().filter_map(|(ssrc, data)| Some((*ssrc, data.decoded_voice.as_deref()?))))
+            }
             EventContext::SpeakingStateUpdate(update) => {
                 inner.on_speaking_update(update.ssrc, update.user_id.map(|u| Id(u.0)));
             }
@@ -604,9 +553,7 @@ impl EventHandler for Handler {
             EventContext::DriverConnect(data) | EventContext::DriverReconnect(data) => {
                 inner.on_driver_connected(Id(data.channel_id.0.get()));
             }
-            EventContext::DriverDisconnect(data) => {
-                inner.on_driver_disconnected(data.kind, data.reason)
-            }
+            EventContext::DriverDisconnect(data) => inner.on_driver_disconnected(data.kind, data.reason),
             _ => {}
         }
         None
@@ -672,10 +619,7 @@ mod tests {
         let (vm, _rx, audio) = manager();
         let mut fut = pin!(vm.connect(info()));
         let mut cx = Context::from_waker(Waker::noop());
-        assert!(matches!(
-            fut.as_mut().poll(&mut cx),
-            Poll::Ready(Err(VoiceError::NotInRuntime))
-        ));
+        assert!(matches!(fut.as_mut().poll(&mut cx), Poll::Ready(Err(VoiceError::NotInRuntime))));
         assert_eq!(vm.state(), VoiceState::Idle);
         audio.shutdown();
     }
@@ -698,18 +642,11 @@ mod tests {
         vm.disconnect().await;
         assert_eq!(vm.state(), VoiceState::Idle);
         let events = drain(&mut rx);
-        assert!(
-            matches!(events.as_slice(), [VoiceEvent::State(VoiceState::Idle)]),
-            "{events:?}"
-        );
+        assert!(matches!(events.as_slice(), [VoiceEvent::State(VoiceState::Idle)]), "{events:?}");
 
         // Muted: the gate loop must never report transmission.
         tokio::time::sleep(Duration::from_millis(60)).await;
-        assert!(
-            drain(&mut rx)
-                .iter()
-                .all(|e| !matches!(e, VoiceEvent::SelfSpeaking(true)))
-        );
+        assert!(drain(&mut rx).iter().all(|e| !matches!(e, VoiceEvent::SelfSpeaking(true))));
         audio.shutdown();
     }
 
@@ -725,10 +662,7 @@ mod tests {
         let (vm, mut rx, audio) = manager();
         let mut bad = info();
         bad.token.clear();
-        assert!(matches!(
-            vm.connect(bad).await,
-            Err(VoiceError::Connection(_))
-        ));
+        assert!(matches!(vm.connect(bad).await, Err(VoiceError::Connection(_))));
         assert_eq!(vm.state(), VoiceState::Idle);
         assert!(drain(&mut rx).is_empty());
         audio.shutdown();
@@ -753,19 +687,12 @@ mod tests {
 
         vm.set_self_deaf(true);
         inner.on_voice_tick([(111, &loud[..])]);
-        assert!(
-            inner.rx.lock().mix.iter().all(|&s| s == 0.0),
-            "deafened output is silent"
-        );
+        assert!(inner.rx.lock().mix.iter().all(|&s| s == 0.0), "deafened output is silent");
         vm.set_self_deaf(false);
 
         inner.on_user_left(Id(7));
         assert!(vm.speaking_users().is_empty());
-        assert_eq!(
-            inner.rx.lock().ssrcs.user(111),
-            None,
-            "SSRC forgotten on ClientDisconnect"
-        );
+        assert_eq!(inner.rx.lock().ssrcs.user(111), None, "SSRC forgotten on ClientDisconnect");
 
         let events = drain(&mut rx);
         let speaking: Vec<_> = events
@@ -776,11 +703,7 @@ mod tests {
             })
             .collect();
         assert_eq!(speaking, vec![(Id(7), true), (Id(7), false)]);
-        assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, VoiceEvent::UserLeft { user_id } if *user_id == Id(7)))
-        );
+        assert!(events.iter().any(|e| matches!(e, VoiceEvent::UserLeft { user_id } if *user_id == Id(7))));
         audio.shutdown();
     }
 
@@ -792,25 +715,13 @@ mod tests {
         let mut target = info();
         target.endpoint = "127.0.0.1:9".into();
         let result = tokio::time::timeout(Duration::from_secs(60), vm.connect(target)).await;
-        assert!(
-            matches!(result, Ok(Err(VoiceError::Connection(_)))),
-            "{result:?}"
-        );
+        assert!(matches!(result, Ok(Err(VoiceError::Connection(_)))), "{result:?}");
         assert!(matches!(vm.state(), VoiceState::Failed(_)));
 
         tokio::time::sleep(Duration::from_millis(200)).await;
         let events = drain(&mut rx);
-        assert!(
-            matches!(
-                events.first(),
-                Some(VoiceEvent::State(VoiceState::Connecting))
-            ),
-            "{events:?}"
-        );
-        let errors = events
-            .iter()
-            .filter(|e| matches!(e, VoiceEvent::Error(_)))
-            .count();
+        assert!(matches!(events.first(), Some(VoiceEvent::State(VoiceState::Connecting))), "{events:?}");
+        let errors = events.iter().filter(|e| matches!(e, VoiceEvent::Error(_))).count();
         assert_eq!(errors, 1, "{events:?}");
 
         vm.disconnect().await;
@@ -820,19 +731,9 @@ mod tests {
 
     #[test]
     fn disconnect_reasons_are_readable() {
-        let msg = describe_disconnect(
-            DisconnectKind::Runtime,
-            Some(DisconnectReason::WsClosed(Some(
-                songbird::model::CloseCode::Disconnected,
-            ))),
-        );
-        assert_eq!(
-            msg,
-            "disconnected from voice: closed by server: Disconnected (4014)"
-        );
-        assert_eq!(
-            describe_disconnect(DisconnectKind::Connect, None),
-            "could not connect to voice: unknown reason"
-        );
+        let msg =
+            describe_disconnect(DisconnectKind::Runtime, Some(DisconnectReason::WsClosed(Some(songbird::model::CloseCode::Disconnected))));
+        assert_eq!(msg, "disconnected from voice: closed by server: Disconnected (4014)");
+        assert_eq!(describe_disconnect(DisconnectKind::Connect, None), "could not connect to voice: unknown reason");
     }
 }

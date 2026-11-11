@@ -48,38 +48,17 @@ pub fn day_divider(prev: Option<&Message>, msg: &Message) -> Option<String> {
 }
 
 /// [`day_divider`] with an explicit timezone.
-pub fn day_divider_in<Tz: TimeZone>(
-    tz: &Tz,
-    prev: Option<&Message>,
-    msg: &Message,
-) -> Option<String> {
+pub fn day_divider_in<Tz: TimeZone>(tz: &Tz, prev: Option<&Message>, msg: &Message) -> Option<String> {
     let date = date_in(msg, tz)?;
     if prev.is_some_and(|p| date_in(p, tz) == Some(date)) {
         return None;
     }
-    Some(format!(
-        "{} {}, {}",
-        month_name(date.month()),
-        date.day(),
-        date.year()
-    ))
+    Some(format!("{} {}, {}", month_name(date.month()), date.day(), date.year()))
 }
 
 fn month_name(m: u32) -> &'static str {
-    const NAMES: [&str; 12] = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ];
+    const NAMES: [&str; 12] =
+        ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     NAMES[(m.clamp(1, 12) - 1) as usize]
 }
 
@@ -92,11 +71,7 @@ mod tests {
 
     fn msg(author: u64, ts: &str) -> Message {
         Message {
-            author: User {
-                id: Id(author),
-                username: format!("user{author}"),
-                ..Default::default()
-            },
+            author: User { id: Id(author), username: format!("user{author}"), ..Default::default() },
             timestamp: ts.to_string(),
             ..Default::default()
         }
@@ -112,35 +87,16 @@ mod tests {
     #[test]
     fn same_author_within_window_groups() {
         let a = msg(1, A);
-        assert!(!starts_group_in(
-            &Utc,
-            Some(&a),
-            &msg(1, "2026-11-11T10:09:00+00:00")
-        ));
-        assert!(!starts_group_in(
-            &Utc,
-            Some(&a),
-            &msg(1, "2026-11-11T10:14:00+00:00")
-        ));
-        assert!(!starts_group(
-            Some(&a),
-            &msg(1, "2026-11-11T10:09:00+00:00")
-        ));
+        assert!(!starts_group_in(&Utc, Some(&a), &msg(1, "2026-11-11T10:09:00+00:00")));
+        assert!(!starts_group_in(&Utc, Some(&a), &msg(1, "2026-11-11T10:14:00+00:00")));
+        assert!(!starts_group(Some(&a), &msg(1, "2026-11-11T10:09:00+00:00")));
     }
 
     #[test]
     fn window_author_and_order() {
         let a = msg(1, A);
-        assert!(starts_group_in(
-            &Utc,
-            Some(&a),
-            &msg(1, "2026-11-11T10:14:01+00:00")
-        ));
-        assert!(starts_group_in(
-            &Utc,
-            Some(&a),
-            &msg(2, "2026-11-11T10:08:00+00:00")
-        ));
+        assert!(starts_group_in(&Utc, Some(&a), &msg(1, "2026-11-11T10:14:01+00:00")));
+        assert!(starts_group_in(&Utc, Some(&a), &msg(2, "2026-11-11T10:08:00+00:00")));
         let later = msg(1, "2026-11-11T10:20:00+00:00");
         assert!(starts_group_in(&Utc, Some(&later), &a));
     }
@@ -153,27 +109,16 @@ mod tests {
         assert!(starts_group_in(&Utc, Some(&a), &reply));
 
         let mut referenced = msg(1, "2026-11-11T10:08:00+00:00");
-        referenced.message_reference = Some(MessageReference {
-            message_id: Some(Id(9)),
-            ..Default::default()
-        });
+        referenced.message_reference = Some(MessageReference { message_id: Some(Id(9)), ..Default::default() });
         assert!(starts_group_in(&Utc, Some(&a), &referenced));
 
         let mut system = msg(1, "2026-11-11T10:08:00+00:00");
         system.kind = message_kind::CHANNEL_PINNED_MESSAGE;
         assert!(starts_group_in(&Utc, Some(&a), &system));
-        assert!(starts_group_in(
-            &Utc,
-            Some(&system),
-            &msg(1, "2026-11-11T10:09:00+00:00")
-        ));
+        assert!(starts_group_in(&Utc, Some(&system), &msg(1, "2026-11-11T10:09:00+00:00")));
 
         // A plain follow-up to a reply from the same author stays grouped.
-        assert!(!starts_group_in(
-            &Utc,
-            Some(&reply),
-            &msg(1, "2026-11-11T10:09:00+00:00")
-        ));
+        assert!(!starts_group_in(&Utc, Some(&reply), &msg(1, "2026-11-11T10:09:00+00:00")));
     }
 
     #[test]
@@ -204,18 +149,9 @@ mod tests {
     fn day_dividers() {
         let a = msg(1, "2026-11-11T23:58:00+00:00");
         let b = msg(1, "2026-11-12T00:01:00+00:00");
-        assert_eq!(
-            day_divider_in(&Utc, None, &a).as_deref(),
-            Some("November 11, 2026")
-        );
-        assert_eq!(
-            day_divider_in(&Utc, Some(&a), &b).as_deref(),
-            Some("November 12, 2026")
-        );
-        assert_eq!(
-            day_divider_in(&Utc, Some(&a), &msg(2, "2026-11-11T01:00:00+00:00")),
-            None
-        );
+        assert_eq!(day_divider_in(&Utc, None, &a).as_deref(), Some("November 11, 2026"));
+        assert_eq!(day_divider_in(&Utc, Some(&a), &b).as_deref(), Some("November 12, 2026"));
+        assert_eq!(day_divider_in(&Utc, Some(&a), &msg(2, "2026-11-11T01:00:00+00:00")), None);
         let est = FixedOffset::west_opt(5 * 3600).unwrap();
         assert_eq!(day_divider_in(&est, Some(&a), &b), None);
         assert!(day_divider(None, &a).is_some());

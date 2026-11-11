@@ -24,17 +24,11 @@ fn cfg(server: &MockServer) -> OAuthConfig {
 }
 
 fn form(req: &Request) -> HashMap<String, String> {
-    url::form_urlencoded::parse(&req.body)
-        .into_owned()
-        .collect()
+    url::form_urlencoded::parse(&req.body).into_owned().collect()
 }
 
 fn query(url: &str) -> HashMap<String, String> {
-    url::Url::parse(url)
-        .unwrap()
-        .query_pairs()
-        .into_owned()
-        .collect()
+    url::Url::parse(url).unwrap().query_pairs().into_owned().collect()
 }
 
 async fn mock_token_ok(server: &MockServer) {
@@ -52,32 +46,18 @@ async fn mock_token_ok(server: &MockServer) {
 }
 
 async fn token_requests(server: &MockServer) -> Vec<Request> {
-    server
-        .received_requests()
-        .await
-        .unwrap()
-        .into_iter()
-        .filter(|r| r.url.path() == "/token")
-        .collect()
+    server.received_requests().await.unwrap().into_iter().filter(|r| r.url.path() == "/token").collect()
 }
 
 /// Minimal raw HTTP client: returns (status, body).
 async fn raw_get(port: u16, target: &str) -> (u16, String) {
     let mut s = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-    s.write_all(
-        format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n")
-            .as_bytes(),
-    )
-    .await
-    .unwrap();
+    s.write_all(format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n").as_bytes()).await.unwrap();
     let mut buf = Vec::new();
     s.read_to_end(&mut buf).await.unwrap();
     let text = String::from_utf8_lossy(&buf).into_owned();
     let status = text.split_whitespace().nth(1).unwrap().parse().unwrap();
-    let body = text
-        .split_once("\r\n\r\n")
-        .map(|(_, b)| b.to_string())
-        .unwrap_or_default();
+    let body = text.split_once("\r\n\r\n").map(|(_, b)| b.to_string()).unwrap_or_default();
     (status, body)
 }
 
@@ -102,10 +82,7 @@ fn port_of(authorize_url: &str) -> u16 {
     url::Url::parse(&redirect).unwrap().port().unwrap()
 }
 
-async fn run_flow<F, Fut>(
-    cfg: &OAuthConfig,
-    browser: F,
-) -> (Result<oauth::OAuthTokens, AuthError>, Fut::Output)
+async fn run_flow<F, Fut>(cfg: &OAuthConfig, browser: F) -> (Result<oauth::OAuthTokens, AuthError>, Fut::Output)
 where
     F: FnOnce(String) -> Fut,
     Fut: std::future::Future,
@@ -146,10 +123,7 @@ async fn full_flow_exchanges_code_with_pkce_and_no_secret() {
     assert_eq!(fav.0, 404);
     assert_eq!(callback.0, 200);
     assert!(callback.1.contains("Signed in — you can close this tab"));
-    assert!(
-        !callback.1.contains("abc"),
-        "the code must not be reflected"
-    );
+    assert!(!callback.1.contains("abc"), "the code must not be reflected");
 
     let q = query(&authorize_url);
     assert_eq!(q["client_id"], CLIENT_ID);
@@ -164,29 +138,10 @@ async fn full_flow_exchanges_code_with_pkce_and_no_secret() {
     assert_eq!(body["code"], "abc");
     assert_eq!(body["client_id"], CLIENT_ID);
     assert_eq!(body["redirect_uri"], q["redirect_uri"]);
-    assert_eq!(
-        Pkce::from_verifier(&body["code_verifier"]).challenge,
-        q["code_challenge"]
-    );
+    assert_eq!(Pkce::from_verifier(&body["code_verifier"]).challenge, q["code_challenge"]);
     assert!(!body.contains_key("client_secret"));
-    assert_eq!(
-        reqs[0]
-            .headers
-            .get("content-type")
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        "application/x-www-form-urlencoded"
-    );
-    assert!(
-        reqs[0]
-            .headers
-            .get("user-agent")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .starts_with("DiscordBot (")
-    );
+    assert_eq!(reqs[0].headers.get("content-type").unwrap().to_str().unwrap(), "application/x-www-form-urlencoded");
+    assert!(reqs[0].headers.get("user-agent").unwrap().to_str().unwrap().starts_with("DiscordBot ("));
 }
 
 #[tokio::test]
@@ -212,10 +167,8 @@ async fn state_mismatch_is_rejected_without_exchanging() {
     let server = MockServer::start().await;
     mock_token_ok(&server).await;
 
-    let (result, (status, body)) = run_flow(&cfg(&server), |url| async move {
-        raw_get(port_of(&url), "/callback?code=abc&state=forged").await
-    })
-    .await;
+    let (result, (status, body)) =
+        run_flow(&cfg(&server), |url| async move { raw_get(port_of(&url), "/callback?code=abc&state=forged").await }).await;
 
     assert_eq!(result.unwrap_err(), AuthError::StateMismatch);
     assert_eq!(status, 400);
@@ -227,10 +180,7 @@ async fn state_mismatch_is_rejected_without_exchanging() {
 async fn code_without_state_is_rejected() {
     let server = MockServer::start().await;
     mock_token_ok(&server).await;
-    let (result, (status, _)) = run_flow(&cfg(&server), |url| async move {
-        raw_get(port_of(&url), "/callback?code=abc").await
-    })
-    .await;
+    let (result, (status, _)) = run_flow(&cfg(&server), |url| async move { raw_get(port_of(&url), "/callback?code=abc").await }).await;
     assert_eq!(result.unwrap_err(), AuthError::StateMismatch);
     assert_eq!(status, 400);
     assert!(token_requests(&server).await.is_empty());
@@ -243,31 +193,22 @@ async fn access_denied_maps_to_denied() {
 
     let (result, (status, body)) = run_flow(&cfg(&server), |url| async move {
         let state = query(&url)["state"].clone();
-        raw_get(
-            port_of(&url),
-            &format!("/callback?error=access_denied&error_description=The+resource+owner+denied&state={state}"),
-        )
-        .await
+        raw_get(port_of(&url), &format!("/callback?error=access_denied&error_description=The+resource+owner+denied&state={state}")).await
     })
     .await;
 
     assert_eq!(result.unwrap_err(), AuthError::Denied);
     assert_eq!(status, 200);
     assert!(body.contains("Sign-in was cancelled"));
-    assert!(
-        !body.contains("resource owner"),
-        "request text must not be reflected"
-    );
+    assert!(!body.contains("resource owner"), "request text must not be reflected");
     assert!(token_requests(&server).await.is_empty());
 }
 
 #[tokio::test]
 async fn error_with_forged_state_is_a_mismatch_not_a_denial() {
     let server = MockServer::start().await;
-    let (result, _) = run_flow(&cfg(&server), |url| async move {
-        raw_get(port_of(&url), "/callback?error=access_denied&state=forged").await
-    })
-    .await;
+    let (result, _) =
+        run_flow(&cfg(&server), |url| async move { raw_get(port_of(&url), "/callback?error=access_denied&state=forged").await }).await;
     assert_eq!(result.unwrap_err(), AuthError::StateMismatch);
 }
 
@@ -276,18 +217,11 @@ async fn other_authorization_errors_are_reported() {
     let server = MockServer::start().await;
     let (result, _) = run_flow(&cfg(&server), |url| async move {
         let state = query(&url)["state"].clone();
-        raw_get(
-            port_of(&url),
-            &format!("/callback?error=invalid_scope&error_description=bad%20scope&state={state}"),
-        )
-        .await
+        raw_get(port_of(&url), &format!("/callback?error=invalid_scope&error_description=bad%20scope&state={state}")).await
     })
     .await;
     match result.unwrap_err() {
-        AuthError::Other(msg) => assert!(
-            msg.contains("invalid_scope") && msg.contains("bad scope"),
-            "{msg}"
-        ),
+        AuthError::Other(msg) => assert!(msg.contains("invalid_scope") && msg.contains("bad scope"), "{msg}"),
         other => panic!("unexpected {other:?}"),
     }
 }
@@ -304,9 +238,7 @@ async fn stray_requests_and_idle_connections_do_not_end_or_block_the_flow() {
         let _idle = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
         let no_code = raw_get(port, "/callback").await.0;
         let wrong_path = raw_get(port, "/").await.0;
-        let ok = raw_get(port, &format!("/callback?code=abc&state={state}"))
-            .await
-            .0;
+        let ok = raw_get(port, &format!("/callback?code=abc&state={state}")).await.0;
         vec![no_code, wrong_path, ok]
     })
     .await;
@@ -350,11 +282,7 @@ async fn times_out_when_no_callback_arrives() {
     let server = MockServer::start().await;
     let (_cancel_tx, cancel_rx) = oneshot::channel();
     let started = std::time::Instant::now();
-    let err = oauth::sign_in_with(&cfg(&server), cancel_rx, Duration::from_millis(200), |_| {
-        Ok(())
-    })
-    .await
-    .unwrap_err();
+    let err = oauth::sign_in_with(&cfg(&server), cancel_rx, Duration::from_millis(200), |_| Ok(())).await.unwrap_err();
     assert_eq!(err, AuthError::Timeout);
     assert!(started.elapsed() < Duration::from_secs(5));
 }
@@ -374,9 +302,7 @@ async fn cancel_returns_early_and_dropping_the_sender_cancels_too() {
 
     let (tx, rx) = oneshot::channel::<()>();
     drop(tx);
-    let err = oauth::sign_in_with(&cfg(&server), rx, Duration::from_secs(30), |_| Ok(()))
-        .await
-        .unwrap_err();
+    let err = oauth::sign_in_with(&cfg(&server), rx, Duration::from_secs(30), |_| Ok(())).await.unwrap_err();
     assert_eq!(err, AuthError::Cancelled);
 }
 
@@ -385,18 +311,14 @@ async fn sign_in_without_browser_honours_cancel() {
     let server = MockServer::start().await;
     let (tx, rx) = oneshot::channel();
     tx.send(()).unwrap();
-    let err = oauth::sign_in(&cfg(&server), false, rx, Duration::from_secs(30))
-        .await
-        .unwrap_err();
+    let err = oauth::sign_in(&cfg(&server), false, rx, Duration::from_secs(30)).await.unwrap_err();
     assert_eq!(err, AuthError::Cancelled);
 }
 
 #[tokio::test]
 async fn port_in_use_fails_before_the_browser_is_opened() {
     let server = MockServer::start().await;
-    let blocker = tokio::net::TcpListener::bind(("127.0.0.1", 0))
-        .await
-        .unwrap();
+    let blocker = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
     let port = blocker.local_addr().unwrap().port();
     let mut cfg = cfg(&server);
     cfg.redirect_port = port;
@@ -417,11 +339,7 @@ async fn port_in_use_fails_before_the_browser_is_opened() {
 #[tokio::test]
 async fn invalid_config_is_rejected_before_binding() {
     let (_tx, rx) = oneshot::channel();
-    let err = oauth::sign_in_with(&OAuthConfig::default(), rx, Duration::from_secs(1), |_| {
-        Ok(())
-    })
-    .await
-    .unwrap_err();
+    let err = oauth::sign_in_with(&OAuthConfig::default(), rx, Duration::from_secs(1), |_| Ok(())).await.unwrap_err();
     assert!(matches!(err, AuthError::InvalidConfig(_)));
 }
 
@@ -429,11 +347,8 @@ async fn invalid_config_is_rejected_before_binding() {
 async fn callback_error_aborts_sign_in() {
     let server = MockServer::start().await;
     let (_tx, rx) = oneshot::channel();
-    let err = oauth::sign_in_with(&cfg(&server), rx, Duration::from_secs(1), |_| {
-        Err(AuthError::Other("no browser".into()))
-    })
-    .await
-    .unwrap_err();
+    let err =
+        oauth::sign_in_with(&cfg(&server), rx, Duration::from_secs(1), |_| Err(AuthError::Other("no browser".into()))).await.unwrap_err();
     assert_eq!(err, AuthError::Other("no browser".into()));
 }
 
@@ -474,10 +389,7 @@ async fn refresh_invalid_grant_is_session_expired() {
         .respond_with(ResponseTemplate::new(400).set_body_json(json!({"error": "invalid_grant"})))
         .mount(&server)
         .await;
-    assert_eq!(
-        oauth::refresh(&cfg(&server), "old").await.unwrap_err(),
-        AuthError::SessionExpired
-    );
+    assert_eq!(oauth::refresh(&cfg(&server), "old").await.unwrap_err(), AuthError::SessionExpired);
 }
 
 #[tokio::test]
@@ -488,10 +400,7 @@ async fn invalid_client_error_includes_setup_hint() {
         .respond_with(ResponseTemplate::new(401).set_body_json(json!({"error": "invalid_client"})))
         .mount(&server)
         .await;
-    match oauth::exchange_code(&cfg(&server), "c", "v")
-        .await
-        .unwrap_err()
-    {
+    match oauth::exchange_code(&cfg(&server), "c", "v").await.unwrap_err() {
         AuthError::Http { status, message } => {
             assert_eq!(status, 401);
             assert!(message.contains("Public Client"), "{message}");
@@ -503,11 +412,7 @@ async fn invalid_client_error_includes_setup_hint() {
 #[tokio::test]
 async fn revoke_request_shape() {
     let server = MockServer::start().await;
-    Mock::given(method("POST"))
-        .and(path("/revoke"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-        .mount(&server)
-        .await;
+    Mock::given(method("POST")).and(path("/revoke")).respond_with(ResponseTemplate::new(200).set_body_json(json!({}))).mount(&server).await;
 
     oauth::revoke(&cfg(&server), "refresh-1").await.unwrap();
     let mut with_secret = cfg(&server);
@@ -520,33 +425,15 @@ async fn revoke_request_shape() {
     assert_eq!(a["client_id"], CLIENT_ID);
     assert!(!a.contains_key("client_secret"));
     let b = form(&reqs[1]);
-    assert_eq!(
-        (b["token"].as_str(), b["client_secret"].as_str()),
-        ("access-1", "s3cret")
-    );
-    assert_eq!(
-        reqs[0]
-            .headers
-            .get("content-type")
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        "application/x-www-form-urlencoded"
-    );
+    assert_eq!((b["token"].as_str(), b["client_secret"].as_str()), ("access-1", "s3cret"));
+    assert_eq!(reqs[0].headers.get("content-type").unwrap().to_str().unwrap(), "application/x-www-form-urlencoded");
 }
 
 #[tokio::test]
 async fn revoke_failure_is_reported() {
     let server = MockServer::start().await;
-    Mock::given(method("POST"))
-        .and(path("/revoke"))
-        .respond_with(ResponseTemplate::new(500))
-        .mount(&server)
-        .await;
-    assert!(matches!(
-        oauth::revoke(&cfg(&server), "t").await,
-        Err(AuthError::Http { status: 500, .. })
-    ));
+    Mock::given(method("POST")).and(path("/revoke")).respond_with(ResponseTemplate::new(500)).mount(&server).await;
+    assert!(matches!(oauth::revoke(&cfg(&server), "t").await, Err(AuthError::Http { status: 500, .. })));
 }
 
 #[tokio::test]
@@ -560,36 +447,20 @@ async fn fetch_user_uses_bearer_and_maps_401() {
         })))
         .mount(&server)
         .await;
-    Mock::given(method("GET"))
-        .and(path("/users/@me"))
-        .respond_with(ResponseTemplate::new(401))
-        .mount(&server)
-        .await;
+    Mock::given(method("GET")).and(path("/users/@me")).respond_with(ResponseTemplate::new(401)).mount(&server).await;
 
     let user = oauth::fetch_user("good", &server.uri()).await.unwrap();
     assert_eq!(user.id.get(), 80351110224678912);
     assert_eq!(user.display_name(), "Nelly");
-    assert_eq!(
-        oauth::fetch_user("bad", &format!("{}/", server.uri()))
-            .await
-            .unwrap_err(),
-        AuthError::SessionExpired
-    );
+    assert_eq!(oauth::fetch_user("bad", &format!("{}/", server.uri())).await.unwrap_err(), AuthError::SessionExpired);
 }
 
 #[tokio::test]
 async fn network_failure_is_reported_as_network_error() {
-    let closed = tokio::net::TcpListener::bind(("127.0.0.1", 0))
-        .await
-        .unwrap();
+    let closed = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
     let port = closed.local_addr().unwrap().port();
     drop(closed);
-    let err = oauth::fetch_user("t", &format!("http://127.0.0.1:{port}"))
-        .await
-        .unwrap_err();
+    let err = oauth::fetch_user("t", &format!("http://127.0.0.1:{port}")).await.unwrap_err();
     assert!(matches!(err, AuthError::Network(_)), "{err:?}");
-    assert!(
-        !err.to_string().contains("127.0.0.1"),
-        "URLs are stripped from transport errors"
-    );
+    assert!(!err.to_string().contains("127.0.0.1"), "URLs are stripped from transport errors");
 }

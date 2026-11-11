@@ -153,7 +153,10 @@ fn reactions_updates_and_deletes() {
     s.set_active_channel(Some(Id(10)));
     s.messages_loaded(Id(10), vec![msg(5, 10, 2, "hi")], None, true);
     let add = |user: u64| {
-        d("MESSAGE_REACTION_ADD", serde_json::json!({"user_id":user.to_string(),"channel_id":"10","message_id":"5","emoji":{"id":null,"name":"👍"}}))
+        d(
+            "MESSAGE_REACTION_ADD",
+            serde_json::json!({"user_id":user.to_string(),"channel_id":"10","message_id":"5","emoji":{"id":null,"name":"👍"}}),
+        )
     };
     s.apply(&add(2));
     s.apply(&add(ME));
@@ -166,7 +169,10 @@ fn reactions_updates_and_deletes() {
     ));
     let r = &s.channel_messages(Id(10)).unwrap().get(Id(5)).unwrap().reactions[0];
     assert_eq!((r.count, r.me), (1, false));
-    s.apply(&d("MESSAGE_UPDATE", serde_json::json!({"id":"5","channel_id":"10","content":"edited","edited_timestamp":"2024-01-01T00:00:00Z"})));
+    s.apply(&d(
+        "MESSAGE_UPDATE",
+        serde_json::json!({"id":"5","channel_id":"10","content":"edited","edited_timestamp":"2024-01-01T00:00:00Z"}),
+    ));
     assert_eq!(s.channel_messages(Id(10)).unwrap().get(Id(5)).unwrap().content, "edited");
     s.apply(&d("MESSAGE_DELETE", serde_json::json!({"id":"5","channel_id":"10"})));
     assert!(s.channel_messages(Id(10)).unwrap().messages.is_empty());
@@ -203,7 +209,10 @@ fn typing_expires_and_clears_on_message() {
 fn voice_states_track_join_move_leave() {
     let mut s = setup();
     assert_eq!(s.voice_members(Id(G), Id(22)).len(), 1);
-    s.apply(&d("VOICE_STATE_UPDATE", serde_json::json!({"guild_id":"1","channel_id":"22","user_id":"3","session_id":"y","self_mute":true})));
+    s.apply(&d(
+        "VOICE_STATE_UPDATE",
+        serde_json::json!({"guild_id":"1","channel_id":"22","user_id":"3","session_id":"y","self_mute":true}),
+    ));
     assert_eq!(s.voice_members(Id(G), Id(22)).len(), 2);
     s.apply(&d("VOICE_STATE_UPDATE", serde_json::json!({"guild_id":"1","channel_id":null,"user_id":"2","session_id":"x"})));
     let v = s.voice_members(Id(G), Id(22));

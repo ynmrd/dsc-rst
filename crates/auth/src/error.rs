@@ -10,17 +10,13 @@ pub enum AuthError {
     PortInUse(u16),
     #[error("Sign-in was cancelled or access was denied in Discord.")]
     Denied,
-    #[error(
-        "The sign-in response did not match this request and was rejected. Please try signing in again."
-    )]
+    #[error("The sign-in response did not match this request and was rejected. Please try signing in again.")]
     StateMismatch,
     #[error("Sign-in timed out while waiting for Discord. Please try again.")]
     Timeout,
     #[error("Sign-in was cancelled.")]
     Cancelled,
-    #[error(
-        "Discord rejected this bot token. Check that you copied the complete token from the Bot page of your application."
-    )]
+    #[error("Discord rejected this bot token. Check that you copied the complete token from the Bot page of your application.")]
     InvalidToken,
     #[error(
         "This is not a bot token. Discord Native only accepts the token of a bot application you own; never paste a personal account token."
@@ -116,37 +112,20 @@ impl ApiError {
             (None, None) => body.trim().to_string(),
         };
         if parsed.error.as_deref() == Some("invalid_client") {
-            message.push_str(
-                " (check the client ID and secret, and enable \"Public Client\" for apps without a secret)",
-            );
+            message.push_str(" (check the client ID and secret, and enable \"Public Client\" for apps without a secret)");
         }
-        Self {
-            status,
-            code: parsed.error,
-            message: sanitize(&message, 300),
-        }
+        Self { status, code: parsed.error, message: sanitize(&message, 300) }
     }
 
     /// Transport and decode failures never reach Discord's error format; they carry status 0.
     pub fn transport(message: String) -> Self {
-        Self {
-            status: 0,
-            code: None,
-            message,
-        }
+        Self { status: 0, code: None, message }
     }
 }
 
 impl From<ApiError> for AuthError {
     fn from(e: ApiError) -> Self {
-        if e.status == 0 {
-            AuthError::Network(e.message)
-        } else {
-            AuthError::Http {
-                status: e.status,
-                message: e.message,
-            }
-        }
+        if e.status == 0 { AuthError::Network(e.message) } else { AuthError::Http { status: e.status, message: e.message } }
     }
 }
 

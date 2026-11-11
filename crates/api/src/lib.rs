@@ -69,8 +69,7 @@ impl Auth {
             Auth::Bot(_) => format!("Bot {token}"),
             Auth::Bearer(_) => format!("Bearer {token}"),
         };
-        let mut v = HeaderValue::from_str(&raw)
-            .map_err(|_| ApiError::Invalid("the token contains invalid characters".into()))?;
+        let mut v = HeaderValue::from_str(&raw).map_err(|_| ApiError::Invalid("the token contains invalid characters".into()))?;
         v.set_sensitive(true);
         Ok(v)
     }
@@ -164,13 +163,7 @@ impl RestClient {
         url::Url::parse(base).map_err(|e| ApiError::Invalid(format!("invalid API base URL: {e}")))?;
         let auth_header = auth.header_value()?;
         Ok(RestClient {
-            inner: Arc::new(Inner {
-                http: build_http()?,
-                base: base.to_string(),
-                auth,
-                auth_header,
-                limiter: RateLimiter::default(),
-            }),
+            inner: Arc::new(Inner { http: build_http()?, base: base.to_string(), auth, auth_header, limiter: RateLimiter::default() }),
         })
     }
 
@@ -266,8 +259,7 @@ impl RestClient {
 
     /// One page of members (`limit` clamped to 1..=1000). Requires the GUILD_MEMBERS intent.
     pub async fn list_guild_members(&self, guild: Id, after: Option<Id>, limit: u16) -> Result<Vec<Member>, ApiError> {
-        let mut req =
-            Request::new(Method::GET, format!("/guilds/{guild}/members")).query("limit", limit.clamp(1, 1000));
+        let mut req = Request::new(Method::GET, format!("/guilds/{guild}/members")).query("limit", limit.clamp(1, 1000));
         if let Some(a) = after {
             req = req.query("after", a);
         }
@@ -275,8 +267,7 @@ impl RestClient {
     }
 
     pub async fn active_threads(&self, guild: Id) -> Result<Vec<Channel>, ApiError> {
-        let r: ThreadsResponse =
-            self.json(Request::new(Method::GET, format!("/guilds/{guild}/threads/active"))).await?;
+        let r: ThreadsResponse = self.json(Request::new(Method::GET, format!("/guilds/{guild}/threads/active"))).await?;
         Ok(r.threads)
     }
 
@@ -329,8 +320,7 @@ impl RestClient {
 
     /// Messages in Discord's order (newest first).
     pub async fn messages(&self, channel: Id, page: MessagePage) -> Result<Vec<Message>, ApiError> {
-        let mut req =
-            Request::new(Method::GET, format!("/channels/{channel}/messages")).query("limit", page.limit.clamp(1, 100));
+        let mut req = Request::new(Method::GET, format!("/channels/{channel}/messages")).query("limit", page.limit.clamp(1, 100));
         if let Some(id) = page.around {
             req = req.query("around", id);
         } else if let Some(id) = page.before {
@@ -393,8 +383,7 @@ impl RestClient {
                     PreparedFile { name, mime, bytes: Bytes::copy_from_slice(&f.bytes) }
                 })
                 .collect();
-            let attachments: Vec<_> =
-                files.iter().enumerate().map(|(i, f)| json!({ "id": i, "filename": f.name })).collect();
+            let attachments: Vec<_> = files.iter().enumerate().map(|(i, f)| json!({ "id": i, "filename": f.name })).collect();
             payload.insert("attachments".into(), json!(attachments));
             let payload = serde_json::to_string(&payload).map_err(|e| ApiError::Invalid(e.to_string()))?;
             let mut req = Request::new(Method::POST, path);
@@ -406,8 +395,7 @@ impl RestClient {
     }
 
     pub async fn edit_message(&self, channel: Id, id: Id, content: &str) -> Result<Message, ApiError> {
-        let req = Request::new(Method::PATCH, format!("/channels/{channel}/messages/{id}"))
-            .json(&json!({ "content": content }))?;
+        let req = Request::new(Method::PATCH, format!("/channels/{channel}/messages/{id}")).json(&json!({ "content": content }))?;
         self.json(req).await
     }
 
@@ -428,8 +416,7 @@ impl RestClient {
     /// One page of pins, newest first. `before` is the ISO8601 `pinned_at` of the
     /// last pin of the previous page; `limit` is clamped to 1..=50.
     pub async fn pins(&self, channel: Id, before: Option<&str>, limit: u8) -> Result<PinsPage, ApiError> {
-        let mut req =
-            Request::new(Method::GET, format!("/channels/{channel}/messages/pins")).query("limit", limit.clamp(1, 50));
+        let mut req = Request::new(Method::GET, format!("/channels/{channel}/messages/pins")).query("limit", limit.clamp(1, 50));
         if let Some(b) = before.filter(|b| !b.is_empty()) {
             req = req.query("before", b);
         }
@@ -453,8 +440,7 @@ impl RestClient {
         if name.is_empty() || name.chars().count() > 100 {
             return Err(ApiError::Invalid("thread names must be 1-100 characters".into()));
         }
-        let req = Request::new(Method::POST, format!("/channels/{channel}/messages/{message}/threads"))
-            .json(&json!({ "name": name }))?;
+        let req = Request::new(Method::POST, format!("/channels/{channel}/messages/{message}/threads")).json(&json!({ "name": name }))?;
         self.json(req).await
     }
 
@@ -497,20 +483,14 @@ impl RestClient {
     }
 
     fn build(&self, req: &Request, url: &str) -> Result<reqwest::RequestBuilder, ApiError> {
-        let mut rb = self
-            .inner
-            .http
-            .request(req.method.clone(), url)
-            .header(AUTHORIZATION, self.inner.auth_header.clone())
-            .timeout(req.timeout);
+        let mut rb =
+            self.inner.http.request(req.method.clone(), url).header(AUTHORIZATION, self.inner.auth_header.clone()).timeout(req.timeout);
         if !req.query.is_empty() {
             rb = rb.query(&req.query);
         }
         Ok(match &req.body {
             // Discord answers 411 to body-less writes without an explicit length.
-            Body::Empty if matches!(req.method, Method::POST | Method::PUT | Method::PATCH) => {
-                rb.header(CONTENT_LENGTH, 0)
-            }
+            Body::Empty if matches!(req.method, Method::POST | Method::PUT | Method::PATCH) => rb.header(CONTENT_LENGTH, 0),
             Body::Empty => rb,
             Body::Json(bytes) => rb.header(CONTENT_TYPE, "application/json").body(bytes.clone()),
             Body::Multipart { payload, files } => rb.multipart(build_form(payload, files)?),
@@ -616,13 +596,10 @@ fn encode_emoji(emoji: &Emoji) -> Result<String, ApiError> {
 
 fn build_form(payload: &str, files: &[PreparedFile]) -> Result<Form, ApiError> {
     let invalid = |e: reqwest::Error| ApiError::Invalid(e.to_string());
-    let mut form =
-        Form::new().part("payload_json", Part::text(payload.to_owned()).mime_str("application/json").map_err(invalid)?);
+    let mut form = Form::new().part("payload_json", Part::text(payload.to_owned()).mime_str("application/json").map_err(invalid)?);
     for (i, f) in files.iter().enumerate() {
-        let part = Part::stream_with_length(f.bytes.clone(), f.bytes.len() as u64)
-            .file_name(f.name.clone())
-            .mime_str(&f.mime)
-            .map_err(invalid)?;
+        let part =
+            Part::stream_with_length(f.bytes.clone(), f.bytes.len() as u64).file_name(f.name.clone()).mime_str(&f.mime).map_err(invalid)?;
         form = form.part(format!("files[{i}]"), part);
     }
     Ok(form)

@@ -87,9 +87,7 @@ impl OAuthConfig {
     pub fn validate(&self) -> Result<(), AuthError> {
         let id = self.client_id.trim();
         if id.is_empty() {
-            return Err(AuthError::InvalidConfig(
-                "Enter the Client ID of your Discord application first.".into(),
-            ));
+            return Err(AuthError::InvalidConfig("Enter the Client ID of your Discord application first.".into()));
         }
         if id.len() > 20 || !id.bytes().all(|b| b.is_ascii_digit()) {
             return Err(AuthError::InvalidConfig(
@@ -97,18 +95,13 @@ impl OAuthConfig {
             ));
         }
         if self.scopes.iter().all(|s| s.trim().is_empty()) {
-            return Err(AuthError::InvalidConfig(
-                "At least one OAuth2 scope is required.".into(),
-            ));
+            return Err(AuthError::InvalidConfig("At least one OAuth2 scope is required.".into()));
         }
         Ok(())
     }
 
     fn secret(&self) -> Option<&str> {
-        self.client_secret
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
+        self.client_secret.as_deref().map(str::trim).filter(|s| !s.is_empty())
     }
 }
 
@@ -122,19 +115,13 @@ impl Pkce {
     /// `challenge = BASE64URL(SHA256(verifier))` per RFC 7636 §4.2.
     pub fn from_verifier(verifier: &str) -> Self {
         let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
-        Self {
-            verifier: verifier.to_string(),
-            challenge,
-        }
+        Self { verifier: verifier.to_string(), challenge }
     }
 }
 
 impl fmt::Debug for Pkce {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Pkce")
-            .field("verifier", &"<redacted>")
-            .field("challenge", &self.challenge)
-            .finish()
+        f.debug_struct("Pkce").field("verifier", &"<redacted>").field("challenge", &self.challenge).finish()
     }
 }
 
@@ -163,11 +150,7 @@ pub fn authorize_url(cfg: &OAuthConfig, state: &str, pkce: &Pkce) -> String {
         .append_pair("code_challenge_method", "S256")
         .finish()
         .replace('+', "%20");
-    let sep = if cfg.authorize_url.contains('?') {
-        '&'
-    } else {
-        '?'
-    };
+    let sep = if cfg.authorize_url.contains('?') { '&' } else { '?' };
     format!("{}{sep}{query}", cfg.authorize_url)
 }
 
@@ -217,84 +200,48 @@ struct TokenResponse {
 
 impl From<TokenResponse> for OAuthTokens {
     fn from(r: TokenResponse) -> Self {
-        let expires_in = if r.expires_in > 0 {
-            r.expires_in
-        } else {
-            DEFAULT_EXPIRES_IN
-        };
+        let expires_in = if r.expires_in > 0 { r.expires_in } else { DEFAULT_EXPIRES_IN };
         Self {
             access_token: r.access_token,
             refresh_token: r.refresh_token.filter(|t| !t.is_empty()),
             expires_at: now_unix().saturating_add(expires_in),
             scope: r.scope,
-            token_type: if r.token_type.is_empty() {
-                "Bearer".into()
-            } else {
-                r.token_type
-            },
+            token_type: if r.token_type.is_empty() { "Bearer".into() } else { r.token_type },
         }
     }
 }
 
 async fn post_form(url: &str, form: &[(&str, &str)]) -> Result<reqwest::Response, ApiError> {
     let client = http::client().map_err(|e| ApiError::transport(e.to_string()))?;
-    let resp = client
-        .post(url)
-        .form(form)
-        .send()
-        .await
-        .map_err(|e| ApiError::transport(describe(e)))?;
-    if resp.status().is_success() {
-        Ok(resp)
-    } else {
-        Err(ApiError::from_response(resp).await)
-    }
+    let resp = client.post(url).form(form).send().await.map_err(|e| ApiError::transport(describe(e)))?;
+    if resp.status().is_success() { Ok(resp) } else { Err(ApiError::from_response(resp).await) }
 }
 
-async fn token_request(
-    cfg: &OAuthConfig,
-    mut form: Vec<(&str, &str)>,
-) -> Result<OAuthTokens, ApiError> {
+async fn token_request(cfg: &OAuthConfig, mut form: Vec<(&str, &str)>) -> Result<OAuthTokens, ApiError> {
     form.push(("client_id", cfg.client_id.trim()));
     if let Some(secret) = cfg.secret() {
         form.push(("client_secret", secret));
     }
     let resp = post_form(&cfg.token_url, &form).await?;
-    let body: TokenResponse = resp.json().await.map_err(|e| {
-        ApiError::transport(format!("unexpected token response: {}", e.without_url()))
-    })?;
+    let body: TokenResponse =
+        resp.json().await.map_err(|e| ApiError::transport(format!("unexpected token response: {}", e.without_url())))?;
     Ok(body.into())
 }
 
-pub async fn exchange_code(
-    cfg: &OAuthConfig,
-    code: &str,
-    verifier: &str,
-) -> Result<OAuthTokens, AuthError> {
+pub async fn exchange_code(cfg: &OAuthConfig, code: &str, verifier: &str) -> Result<OAuthTokens, AuthError> {
     let redirect_uri = cfg.redirect_uri();
-    let form = vec![
-        ("grant_type", "authorization_code"),
-        ("code", code),
-        ("redirect_uri", redirect_uri.as_str()),
-        ("code_verifier", verifier),
-    ];
+    let form =
+        vec![("grant_type", "authorization_code"), ("code", code), ("redirect_uri", redirect_uri.as_str()), ("code_verifier", verifier)];
     Ok(token_request(cfg, form).await?)
 }
 
 /// An `invalid_grant` answer means the refresh token is revoked or expired and maps to
 /// [`AuthError::SessionExpired`]. Discord rotates refresh tokens; if a response omits one the old one is kept.
 pub async fn refresh(cfg: &OAuthConfig, refresh_token: &str) -> Result<OAuthTokens, AuthError> {
-    let form = vec![
-        ("grant_type", "refresh_token"),
-        ("refresh_token", refresh_token),
-    ];
-    let mut tokens = token_request(cfg, form).await.map_err(|e| {
-        if e.code.as_deref() == Some("invalid_grant") {
-            AuthError::SessionExpired
-        } else {
-            e.into()
-        }
-    })?;
+    let form = vec![("grant_type", "refresh_token"), ("refresh_token", refresh_token)];
+    let mut tokens = token_request(cfg, form)
+        .await
+        .map_err(|e| if e.code.as_deref() == Some("invalid_grant") { AuthError::SessionExpired } else { e.into() })?;
     if tokens.refresh_token.is_none() {
         tokens.refresh_token = Some(refresh_token.to_string());
     }
@@ -313,19 +260,9 @@ pub async fn revoke(cfg: &OAuthConfig, token: &str) -> Result<(), AuthError> {
 
 pub async fn fetch_user(access_token: &str, api_base: &str) -> Result<dn_core::User, AuthError> {
     let client = http::client()?;
-    http::get_json(
-        &client,
-        &http::join(api_base, "users/@me"),
-        &format!("Bearer {access_token}"),
-    )
-    .await
-    .map_err(|e| {
-        if e.status == 401 {
-            AuthError::SessionExpired
-        } else {
-            e.into()
-        }
-    })
+    http::get_json(&client, &http::join(api_base, "users/@me"), &format!("Bearer {access_token}"))
+        .await
+        .map_err(|e| if e.status == 401 { AuthError::SessionExpired } else { e.into() })
 }
 
 /// Signs in through the system browser. With `open_browser == false` nothing opens the URL;
@@ -338,8 +275,7 @@ pub async fn sign_in(
 ) -> Result<OAuthTokens, AuthError> {
     sign_in_with(cfg, cancel, timeout, |url| {
         if open_browser {
-            open::that_detached(url)
-                .map_err(|e| AuthError::Other(format!("Could not open your web browser: {e}")))?;
+            open::that_detached(url).map_err(|e| AuthError::Other(format!("Could not open your web browser: {e}")))?;
         }
         Ok(())
     })
@@ -359,14 +295,10 @@ where
     F: FnOnce(&str) -> Result<(), AuthError>,
 {
     cfg.validate()?;
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, cfg.redirect_port))
-        .await
-        .map_err(|e| match e.kind() {
-            std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied => {
-                AuthError::PortInUse(cfg.redirect_port)
-            }
-            _ => e.into(),
-        })?;
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, cfg.redirect_port)).await.map_err(|e| match e.kind() {
+        std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied => AuthError::PortInUse(cfg.redirect_port),
+        _ => e.into(),
+    })?;
     let mut cfg = cfg.clone();
     cfg.redirect_port = listener.local_addr()?.port();
 
@@ -434,23 +366,13 @@ async fn handle_connection(mut stream: TcpStream, state: &str) -> Option<Callbac
     let head = match read_request_head(&mut stream).await {
         Head::Complete(h) => h,
         Head::TooLarge => {
-            respond_text(
-                &mut stream,
-                431,
-                "Request Header Fields Too Large",
-                "Request too large",
-            )
-            .await;
+            respond_text(&mut stream, 431, "Request Header Fields Too Large", "Request too large").await;
             return None;
         }
         Head::Closed => return None,
     };
 
-    let mut parts = head
-        .lines()
-        .next()
-        .unwrap_or_default()
-        .split_ascii_whitespace();
+    let mut parts = head.lines().next().unwrap_or_default().split_ascii_whitespace();
     let (Some(method), Some(target)) = (parts.next(), parts.next()) else {
         respond_text(&mut stream, 400, "Bad Request", "Bad request").await;
         return None;
@@ -465,9 +387,7 @@ async fn handle_connection(mut stream: TcpStream, state: &str) -> Option<Callbac
         return None;
     }
 
-    let params: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
-        .into_owned()
-        .collect();
+    let params: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes()).into_owned().collect();
     let got_state = params.get("state");
     let state_ok = got_state.is_some_and(|s| ct_eq(s.as_bytes(), state.as_bytes()));
 
@@ -480,14 +400,8 @@ async fn handle_connection(mut stream: TcpStream, state: &str) -> Option<Callbac
         let err = if error == "access_denied" {
             AuthError::Denied
         } else {
-            let detail = params
-                .get("error_description")
-                .map(|d| format!(": {}", sanitize(d, 200)));
-            AuthError::Other(format!(
-                "Discord reported an authorization error ({}){}",
-                sanitize(error, 60),
-                detail.unwrap_or_default()
-            ))
+            let detail = params.get("error_description").map(|d| format!(": {}", sanitize(d, 200)));
+            AuthError::Other(format!("Discord reported an authorization error ({}){}", sanitize(error, 60), detail.unwrap_or_default()))
         };
         return Some(Callback::Fatal(err));
     }
@@ -500,10 +414,7 @@ async fn handle_connection(mut stream: TcpStream, state: &str) -> Option<Callbac
         respond_html(&mut stream, 400, "Bad Request", &MISMATCH_PAGE).await;
         return Some(Callback::Fatal(AuthError::StateMismatch));
     }
-    Some(Callback::Code {
-        code: code.clone(),
-        stream,
-    })
+    Some(Callback::Code { code: code.clone(), stream })
 }
 
 enum Head {
@@ -531,23 +442,14 @@ async fn read_request_head(stream: &mut TcpStream) -> Head {
             }
         }
     };
-    tokio::time::timeout(CONN_TIMEOUT, read)
-        .await
-        .unwrap_or(Head::Closed)
+    tokio::time::timeout(CONN_TIMEOUT, read).await.unwrap_or(Head::Closed)
 }
 
 fn ct_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len()
-        && std::hint::black_box(a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y))) == 0
+    a.len() == b.len() && std::hint::black_box(a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y))) == 0
 }
 
-async fn respond(
-    stream: &mut TcpStream,
-    status: u16,
-    reason: &str,
-    content_type: &str,
-    body: &str,
-) {
+async fn respond(stream: &mut TcpStream, status: u16, reason: &str, content_type: &str, body: &str) {
     let head = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n\
          Cache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n\
@@ -591,19 +493,10 @@ fn page(title: &str, detail: &str, ok: bool) -> String {
     )
 }
 
-static SUCCESS_PAGE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-    page(
-        "Signed in — you can close this tab",
-        "Return to Discord Native to continue.",
-        true,
-    )
-});
+static SUCCESS_PAGE: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| page("Signed in — you can close this tab", "Return to Discord Native to continue.", true));
 static DENIED_PAGE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-    page(
-        "Sign-in was cancelled",
-        "Access was not granted. You can close this tab and try again from Discord Native.",
-        false,
-    )
+    page("Sign-in was cancelled", "Access was not granted. You can close this tab and try again from Discord Native.", false)
 });
 static MISMATCH_PAGE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
     page(
@@ -613,18 +506,10 @@ static MISMATCH_PAGE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| 
     )
 });
 static MISSING_CODE_PAGE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-    page(
-        "Nothing to sign in with",
-        "This page was opened without an authorization code. Start sign-in from Discord Native.",
-        false,
-    )
+    page("Nothing to sign in with", "This page was opened without an authorization code. Start sign-in from Discord Native.", false)
 });
 static FAILURE_PAGE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-    page(
-        "Sign-in could not be completed",
-        "Discord Native could not finish signing in. Return to the app for details.",
-        false,
-    )
+    page("Sign-in could not be completed", "Discord Native could not finish signing in. Return to the app for details.", false)
 });
 
 #[cfg(test)]
@@ -641,16 +526,8 @@ mod tests {
     fn pkce_verifier_is_unreserved_charset_and_in_range() {
         for _ in 0..20 {
             let p = pkce();
-            assert!(
-                (43..=128).contains(&p.verifier.len()),
-                "len {}",
-                p.verifier.len()
-            );
-            assert!(
-                p.verifier
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-            );
+            assert!((43..=128).contains(&p.verifier.len()), "len {}", p.verifier.len());
+            assert!(p.verifier.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'));
             assert_eq!(p.challenge, Pkce::from_verifier(&p.verifier).challenge);
             assert_eq!(p.challenge.len(), 43);
         }
@@ -659,10 +536,7 @@ mod tests {
 
     #[test]
     fn authorize_url_contains_all_params_encoded() {
-        let cfg = OAuthConfig {
-            client_id: "123456789012345678".into(),
-            ..Default::default()
-        };
+        let cfg = OAuthConfig { client_id: "123456789012345678".into(), ..Default::default() };
         let p = Pkce::from_verifier("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk");
         let url = authorize_url(&cfg, "st&te", &p);
         assert!(url.starts_with("https://discord.com/oauth2/authorize?"));
@@ -693,19 +567,12 @@ mod tests {
         assert_eq!(cfg.redirect_uri(), "http://127.0.0.1:53134/callback");
         assert_eq!(cfg.scope_string(), "identify guilds guilds.members.read");
         assert_eq!(cfg.token_url, "https://discord.com/api/oauth2/token");
-        assert_eq!(
-            cfg.revoke_url,
-            "https://discord.com/api/oauth2/token/revoke"
-        );
+        assert_eq!(cfg.revoke_url, "https://discord.com/api/oauth2/token/revoke");
     }
 
     #[test]
     fn config_serialization_omits_secret_and_accepts_partial_input() {
-        let cfg = OAuthConfig {
-            client_id: "1".into(),
-            client_secret: Some("shh-secret".into()),
-            ..Default::default()
-        };
+        let cfg = OAuthConfig { client_id: "1".into(), client_secret: Some("shh-secret".into()), ..Default::default() };
         let json = serde_json::to_string(&cfg).unwrap();
         assert!(!json.contains("shh-secret") && !json.contains("client_secret"));
         let back: OAuthConfig = serde_json::from_str(r#"{"client_id":"42"}"#).unwrap();
@@ -728,11 +595,7 @@ mod tests {
 
     #[test]
     fn debug_output_redacts_secrets() {
-        let cfg = OAuthConfig {
-            client_id: "1".into(),
-            client_secret: Some("shh-client-secret".into()),
-            ..Default::default()
-        };
+        let cfg = OAuthConfig { client_id: "1".into(), client_secret: Some("shh-client-secret".into()), ..Default::default() };
         let tokens = OAuthTokens {
             access_token: "access-token-value".into(),
             refresh_token: Some("refresh-token-value".into()),
@@ -742,12 +605,7 @@ mod tests {
         };
         let p = Pkce::from_verifier("verifier-value-1234567890123456789012345678901234");
         let out = format!("{cfg:?} {tokens:?} {p:?}");
-        for secret in [
-            "shh-client-secret",
-            "access-token-value",
-            "refresh-token-value",
-            "verifier-value",
-        ] {
+        for secret in ["shh-client-secret", "access-token-value", "refresh-token-value", "verifier-value"] {
             assert!(!out.contains(secret), "{secret} leaked: {out}");
         }
     }

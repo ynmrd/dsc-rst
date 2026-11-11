@@ -246,15 +246,8 @@ impl<'a> Lexer<'a> {
             return None;
         };
         let inner = &self.src[i + run..close];
-        let padded = inner.len() >= 2
-            && inner.starts_with(' ')
-            && inner.ends_with(' ')
-            && !inner.trim().is_empty();
-        let code = if padded {
-            &inner[1..inner.len() - 1]
-        } else {
-            inner
-        };
+        let padded = inner.len() >= 2 && inner.starts_with(' ') && inner.ends_with(' ') && !inner.trim().is_empty();
+        let code = if padded { &inner[1..inner.len() - 1] } else { inner };
         Some((Inline::Code(code.to_string()), close + run))
     }
 
@@ -268,14 +261,8 @@ impl<'a> Lexer<'a> {
             return None;
         };
         let end = i + 1 + word;
-        let prev_ok = !self.src[..i]
-            .chars()
-            .next_back()
-            .is_some_and(|c| c.is_alphanumeric() || c == '_');
-        let next_ok = !self.src[end..]
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_alphanumeric() || c == '_');
+        let prev_ok = !self.src[..i].chars().next_back().is_some_and(|c| c.is_alphanumeric() || c == '_');
+        let next_ok = !self.src[end..].chars().next().is_some_and(|c| c.is_alphanumeric() || c == '_');
         (prev_ok && next_ok).then_some((atom, end))
     }
 
@@ -292,14 +279,7 @@ impl<'a> Lexer<'a> {
                 if b.get(e) != Some(&b'>') {
                     return None;
                 }
-                Some((
-                    if role {
-                        Inline::RoleMention(id)
-                    } else {
-                        Inline::UserMention(id)
-                    },
-                    e + 1,
-                ))
+                Some((if role { Inline::RoleMention(id) } else { Inline::UserMention(id) }, e + 1))
             }
             b'#' => {
                 let (id, e) = id_at(b, i + 2)?;
@@ -318,10 +298,7 @@ impl<'a> Lexer<'a> {
         let b = self.b;
         let ns = i + 2;
         let mut j = ns;
-        while j < b.len()
-            && j - ns <= 100
-            && (b[j].is_ascii_alphanumeric() || matches!(b[j], b'_' | b'-' | b' ') || b[j] >= 0x80)
-        {
+        while j < b.len() && j - ns <= 100 && (b[j].is_ascii_alphanumeric() || matches!(b[j], b'_' | b'-' | b' ') || b[j] >= 0x80) {
             j += 1;
         }
         if b.get(j) != Some(&b':') {
@@ -333,15 +310,7 @@ impl<'a> Lexer<'a> {
             return None;
         }
         let (id, e) = id_at(b, j + 1)?;
-        (b.get(e) == Some(&b'>')).then(|| {
-            (
-                Inline::SlashCommand {
-                    name: name.to_string(),
-                    id,
-                },
-                e + 1,
-            )
-        })
+        (b.get(e) == Some(&b'>')).then(|| (Inline::SlashCommand { name: name.to_string(), id }, e + 1))
     }
 
     fn angle_link(&mut self, i: usize) -> Option<(Inline, usize)> {
@@ -408,11 +377,7 @@ impl<'a> Lexer<'a> {
         if self.budget == 0 {
             return None;
         }
-        let limit = self
-            .b
-            .len()
-            .min(from + MAX_URL + 64)
-            .min(from + self.budget);
+        let limit = self.b.len().min(from + MAX_URL + 64).min(from + self.budget);
         let found = scan_dest(self.src, from, limit);
         if found.is_none() {
             self.budget = self.budget.saturating_sub(limit - from);
@@ -427,10 +392,7 @@ fn flanking(c: u8, run: usize, prev: Option<char>, next: Option<char>) -> (bool,
     match c {
         b'|' => (true, true),
         // Single underscores only count at word boundaries (`snake_case` stays literal).
-        b'_' if run == 1 => (
-            next_ok && !prev.is_some_and(char::is_alphanumeric),
-            prev_ok && !next.is_some_and(char::is_alphanumeric),
-        ),
+        b'_' if run == 1 => (next_ok && !prev.is_some_and(char::is_alphanumeric), prev_ok && !next.is_some_and(char::is_alphanumeric)),
         _ => (next_ok, prev_ok),
     }
 }
@@ -455,9 +417,7 @@ fn trim_url_end(url: &str, min: usize) -> usize {
     let mut end = b.len();
     while end > min {
         let drop = match b[end - 1] {
-            b'.' | b',' | b':' | b';' | b'!' | b'?' | b'\'' | b'"' | b'*' | b'_' | b'~' | b'|' => {
-                true
-            }
+            b'.' | b',' | b':' | b';' | b'!' | b'?' | b'\'' | b'"' | b'*' | b'_' | b'~' | b'|' => true,
             b')' if rp > lp => {
                 rp -= 1;
                 true
@@ -477,11 +437,7 @@ fn trim_url_end(url: &str, min: usize) -> usize {
 }
 
 fn id_at(b: &[u8], from: usize) -> Option<(Id, usize)> {
-    let len = b
-        .get(from..)?
-        .iter()
-        .take_while(|c| c.is_ascii_digit())
-        .count();
+    let len = b.get(from..)?.iter().take_while(|c| c.is_ascii_digit()).count();
     if len == 0 || len > 20 {
         return None;
     }
@@ -509,16 +465,7 @@ pub(crate) fn custom_emoji_at(s: &str, i: usize) -> Option<(Inline, usize)> {
         return None;
     }
     let (id, e) = id_at(b, j + 1)?;
-    (b.get(e) == Some(&b'>')).then(|| {
-        (
-            Inline::CustomEmoji {
-                name: s[ns..j].to_string(),
-                id,
-                animated,
-            },
-            e + 1,
-        )
-    })
+    (b.get(e) == Some(&b'>')).then(|| (Inline::CustomEmoji { name: s[ns..j].to_string(), id, animated }, e + 1))
 }
 
 fn timestamp_at(b: &[u8], i: usize) -> Option<(Inline, usize)> {
@@ -570,9 +517,7 @@ fn bracket_table(b: &[u8]) -> Vec<u32> {
 }
 
 fn char_len_at(s: &str, i: usize) -> usize {
-    s.get(i..)
-        .and_then(|r| r.chars().next())
-        .map_or(1, char::len_utf8)
+    s.get(i..).and_then(|r| r.chars().next()).map_or(1, char::len_utf8)
 }
 
 /// Parses `url)`, `<url>)` or `url "title")` starting right after the opening parenthesis.
@@ -620,7 +565,9 @@ fn scan_dest(src: &str, from: usize, limit: usize) -> Option<(String, usize)> {
     while j < limit && blank(b[j]) {
         j += 1;
     }
-    if j < limit && let Some(&q @ (b'"' | b'\'')) = b.get(j) {
+    if j < limit
+        && let Some(&q @ (b'"' | b'\'')) = b.get(j)
+    {
         let tlimit = limit.min(j + 256);
         let close = b[j + 1..tlimit].iter().position(|&c| c == q)?;
         j += close + 2;
@@ -690,9 +637,8 @@ fn pairs(opener: &Delim, closer: &Delim) -> bool {
         _ => {
             // Rule of three: runs that can both open and close pair only if their lengths do not sum to a multiple of 3.
             let m = |n: usize| n % 3;
-            let rejected = (closer.can_open || opener.can_close)
-                && m(opener.orig + closer.orig) == 0
-                && !(m(opener.orig) == 0 && m(closer.orig) == 0);
+            let rejected =
+                (closer.can_open || opener.can_close) && m(opener.orig + closer.orig) == 0 && !(m(opener.orig) == 0 && m(closer.orig) == 0);
             !rejected
         }
     }
@@ -706,25 +652,16 @@ fn resolve(delims: &mut [Delim]) {
     for ci in 0..delims.len() {
         if delims[ci].can_close {
             while delims[ci].viable() {
-                let key = (kind_index(delims[ci].ch) * 2 + usize::from(delims[ci].can_open)) * 3
-                    + delims[ci].orig % 3;
+                let key = (kind_index(delims[ci].ch) * 2 + usize::from(delims[ci].can_open)) * 3 + delims[ci].orig % 3;
                 let bottom = bottoms[key].min(stack.len());
-                let found = (bottom..stack.len())
-                    .rev()
-                    .find(|&si| pairs(&delims[stack[si]], &delims[ci]));
+                let found = (bottom..stack.len()).rev().find(|&si| pairs(&delims[stack[si]], &delims[ci]));
                 let Some(si) = found else {
                     bottoms[key] = stack.len();
                     break;
                 };
                 let oi = stack[si];
                 let ch = delims[ci].ch;
-                let n = if matches!(ch, b'~' | b'|')
-                    || (delims[oi].remaining >= 2 && delims[ci].remaining >= 2)
-                {
-                    2
-                } else {
-                    1
-                };
+                let n = if matches!(ch, b'~' | b'|') || (delims[oi].remaining >= 2 && delims[ci].remaining >= 2) { 2 } else { 1 };
                 let w = wrap_for(ch, n);
                 delims[oi].opens.push(w);
                 delims[oi].used_open += n;
@@ -790,10 +727,7 @@ impl Builder {
         } else {
             None
         };
-        self.frames.push(Frame {
-            wrap,
-            kids: Vec::new(),
-        });
+        self.frames.push(Frame { wrap, kids: Vec::new() });
     }
 
     fn close(&mut self) {
@@ -815,19 +749,9 @@ impl Builder {
 }
 
 fn build(lx: Lexer) -> Vec<Inline> {
-    let Lexer {
-        src,
-        toks,
-        atoms,
-        delims,
-        ..
-    } = lx;
+    let Lexer { src, toks, atoms, delims, .. } = lx;
     let mut atoms: Vec<Option<Inline>> = atoms.into_iter().map(Some).collect();
-    let mut bld = Builder {
-        root: Vec::new(),
-        frames: Vec::new(),
-        real_depth: 0,
-    };
+    let mut bld = Builder { root: Vec::new(), frames: Vec::new(), real_depth: 0 };
     for tok in toks {
         match tok {
             Tok::Text(a, b) => bld.text(&src[a..b]),

@@ -40,12 +40,7 @@ pub fn init_logging(logs_dir: &Path, level: &str, stderr: bool) -> Result<LogGua
 
     let file_layer = fmt::layer().with_writer(writer).with_ansi(false);
     let stderr_layer = stderr.then(|| fmt::layer().with_writer(io::stderr));
-    tracing_subscriber::registry()
-        .with(env_filter(level))
-        .with(file_layer)
-        .with(stderr_layer)
-        .try_init()
-        .map_err(io::Error::other)?;
+    tracing_subscriber::registry().with(env_filter(level)).with(file_layer).with(stderr_layer).try_init().map_err(io::Error::other)?;
     Ok(LogGuard { _worker: worker })
 }
 
@@ -64,9 +59,7 @@ pub(crate) fn prune_old_logs(dir: &Path, max_age: Duration) -> usize {
         .flatten()
         .filter(|e| e.file_name().to_string_lossy().starts_with(LOG_FILE_PREFIX))
         .filter(|e| {
-            e.metadata()
-                .and_then(|m| m.modified())
-                .is_ok_and(|modified| now.duration_since(modified).is_ok_and(|age| age > max_age))
+            e.metadata().and_then(|m| m.modified()).is_ok_and(|modified| now.duration_since(modified).is_ok_and(|age| age > max_age))
         })
         .filter(|e| std::fs::remove_file(e.path()).is_ok())
         .count()

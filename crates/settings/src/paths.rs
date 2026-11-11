@@ -38,12 +38,7 @@ impl Paths {
 
     /// Portable layout: `config/`, `data/`, `cache/` and `logs/` below `root`.
     pub fn under(root: &Path) -> Self {
-        Self {
-            config_dir: root.join("config"),
-            data_dir: root.join("data"),
-            cache_dir: root.join("cache"),
-            logs_dir: root.join("logs"),
-        }
+        Self { config_dir: root.join("config"), data_dir: root.join("data"), cache_dir: root.join("cache"), logs_dir: root.join("logs") }
     }
 
     pub fn ensure(&self) -> io::Result<()> {

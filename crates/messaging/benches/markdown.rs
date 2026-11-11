@@ -23,46 +23,24 @@ fn big_input() -> String {
 
 fn benches(c: &mut Criterion) {
     let mut g = c.benchmark_group("markdown");
-    g.bench_function("parse_short", |b| {
-        b.iter(|| markdown::parse(black_box(SHORT)))
-    });
-    g.bench_function("parse_rich", |b| {
-        b.iter(|| markdown::parse(black_box(RICH)))
-    });
-    g.bench_function("parse_code_block", |b| {
-        b.iter(|| markdown::parse(black_box(CODE)))
-    });
-    g.bench_function("parse_lists", |b| {
-        b.iter(|| markdown::parse(black_box(LIST)))
-    });
-    g.bench_function("parse_inline_title", |b| {
-        b.iter(|| markdown::parse_inline(black_box("**Build** #42 _passed_")))
-    });
+    g.bench_function("parse_short", |b| b.iter(|| markdown::parse(black_box(SHORT))));
+    g.bench_function("parse_rich", |b| b.iter(|| markdown::parse(black_box(RICH))));
+    g.bench_function("parse_code_block", |b| b.iter(|| markdown::parse(black_box(CODE))));
+    g.bench_function("parse_lists", |b| b.iter(|| markdown::parse(black_box(LIST))));
+    g.bench_function("parse_inline_title", |b| b.iter(|| markdown::parse_inline(black_box("**Build** #42 _passed_"))));
     let blocks = markdown::parse(RICH);
-    g.bench_function("plain_text_rich", |b| {
-        b.iter(|| markdown::to_plain_text(black_box(&blocks), &|_| None))
-    });
+    g.bench_function("plain_text_rich", |b| b.iter(|| markdown::to_plain_text(black_box(&blocks), &|_| None)));
     let big = big_input();
     g.sample_size(20);
-    g.bench_function("parse_200kb", |b| {
-        b.iter(|| markdown::parse(black_box(&big)))
-    });
+    g.bench_function("parse_200kb", |b| b.iter(|| markdown::parse(black_box(&big))));
     g.finish();
 
     let mut g = c.benchmark_group("helpers");
-    g.bench_function("replace_shortcodes", |b| {
-        b.iter(|| emoji::replace_shortcodes(black_box("nice :tada: work :+1: `:code:` :unknown:")))
-    });
-    g.bench_function("emoji_search", |b| {
-        b.iter(|| emoji::search(black_box("smi"), 20))
-    });
-    g.bench_function("completion_at", |b| {
-        b.iter(|| compose::completion_at(black_box("hello world @ali"), 16))
-    });
+    g.bench_function("replace_shortcodes", |b| b.iter(|| emoji::replace_shortcodes(black_box("nice :tada: work :+1: `:code:` :unknown:"))));
+    g.bench_function("emoji_search", |b| b.iter(|| emoji::search(black_box("smi"), 20)));
+    g.bench_function("completion_at", |b| b.iter(|| compose::completion_at(black_box("hello world @ali"), 16)));
     let long = "word ".repeat(2000);
-    g.bench_function("split_message_10kb", |b| {
-        b.iter(|| compose::split_message(black_box(&long), 2000))
-    });
+    g.bench_function("split_message_10kb", |b| b.iter(|| compose::split_message(black_box(&long), 2000)));
     g.finish();
 }
 

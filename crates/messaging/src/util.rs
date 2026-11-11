@@ -28,8 +28,5 @@ pub(crate) fn run_len(b: &[u8], from: usize, ch: u8) -> usize {
 
 /// Valid code-fence language tag (single word, no spaces).
 pub(crate) fn is_lang(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= 32
-        && s.bytes()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'+' | b'-' | b'.' | b'#'))
+    !s.is_empty() && s.len() <= 32 && s.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'+' | b'-' | b'.' | b'#'))
 }

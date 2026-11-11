@@ -209,7 +209,8 @@ fn backup(path: &Path, rename: bool) {
     let mut name = path.file_name().map(|n| n.to_os_string()).unwrap_or_default();
     name.push(format!(".bad-{secs}"));
     let dest: PathBuf = path.with_file_name(name);
-    let result = if rename { fs::rename(path, &dest).or_else(|_| fs::copy(path, &dest).map(|_| ())) } else { fs::copy(path, &dest).map(|_| ()) };
+    let result =
+        if rename { fs::rename(path, &dest).or_else(|_| fs::copy(path, &dest).map(|_| ())) } else { fs::copy(path, &dest).map(|_| ()) };
     match result {
         Ok(()) => tracing::warn!("saved the unreadable settings as {}", dest.display()),
         Err(e) => tracing::warn!("could not back up settings to {}: {e}", dest.display()),

@@ -40,10 +40,7 @@ const FONTS: Candidates = Candidates {
         "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
     ],
     italic: &["/usr/share/fonts/truetype/noto/NotoSans-Italic.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"],
-    bold_italic: &[
-        "/usr/share/fonts/truetype/noto/NotoSans-BoldItalic.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
-    ],
+    bold_italic: &["/usr/share/fonts/truetype/noto/NotoSans-BoldItalic.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf"],
     mono: &["/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", "/usr/share/fonts/TTF/DejaVuSansMono.ttf"],
     symbols: &[],
 };
@@ -92,8 +89,7 @@ pub fn definitions(use_system: bool) -> FontDefinitions {
     defs.families.insert(FontFamily::Proportional, prop.clone());
     defs.families.insert(FontFamily::Name(BOLD.into()), chain(bold.as_ref().or(regular.as_ref())));
     defs.families.insert(FontFamily::Name(ITALIC.into()), chain(italic.as_ref().or(regular.as_ref())));
-    defs.families
-        .insert(FontFamily::Name(BOLD_ITALIC.into()), chain(bold_italic.as_ref().or(bold.as_ref()).or(regular.as_ref())));
+    defs.families.insert(FontFamily::Name(BOLD_ITALIC.into()), chain(bold_italic.as_ref().or(bold.as_ref()).or(regular.as_ref())));
     let mut m: Vec<String> = mono.into_iter().collect();
     m.extend(base_mono);
     m.extend(prop);

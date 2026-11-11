@@ -84,11 +84,7 @@ mod platform {
             line.trim_start_matches(':').split_whitespace().next()?.parse().ok()
         };
         let rss = field("VmRSS").unwrap_or(0) * 1024;
-        Memory {
-            rss,
-            private: field("RssAnon").map_or(rss, |kb| kb * 1024),
-            threads: field("Threads").map_or(0, |n| n as u32),
-        }
+        Memory { rss, private: field("RssAnon").map_or(rss, |kb| kb * 1024), threads: field("Threads").map_or(0, |n| n as u32) }
     }
 
     pub(super) fn cpu_time() -> Option<Duration> {

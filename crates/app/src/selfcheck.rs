@@ -28,7 +28,10 @@ pub fn run(paths: &Paths, network: bool) -> ExitCode {
 
     r.check("data directories", {
         let probe = paths.data_dir.join(".write-test");
-        std::fs::write(&probe, b"ok").and_then(|_| std::fs::remove_file(&probe)).map(|_| paths.data_dir.display().to_string()).map_err(|e| e.to_string())
+        std::fs::write(&probe, b"ok")
+            .and_then(|_| std::fs::remove_file(&probe))
+            .map(|_| paths.data_dir.display().to_string())
+            .map_err(|e| e.to_string())
     });
 
     r.check("settings", {
@@ -50,13 +53,22 @@ pub fn run(paths: &Paths, network: bool) -> ExitCode {
                 st.search(&dn_storage::SearchFilter { query: "check".into(), ..Default::default() })
             })
             .map_err(|e| e.to_string())
-            .and_then(|hits| if hits.len() == 1 { Ok(format!("search ok in {:?}", start.elapsed())) } else { Err(format!("expected 1 hit, got {}", hits.len())) })
+            .and_then(|hits| {
+                if hits.len() == 1 {
+                    Ok(format!("search ok in {:?}", start.elapsed()))
+                } else {
+                    Err(format!("expected 1 hit, got {}", hits.len()))
+                }
+            })
     });
 
     r.check("local message cache", {
         let db = paths.database_file();
         if db.exists() {
-            dn_storage::Storage::open(&db).and_then(|s| s.stats()).map(|st| format!("{} messages, {} KB", st.messages, st.db_bytes / 1024)).map_err(|e| e.to_string())
+            dn_storage::Storage::open(&db)
+                .and_then(|s| s.stats())
+                .map(|st| format!("{} messages, {} KB", st.messages, st.db_bytes / 1024))
+                .map_err(|e| e.to_string())
         } else {
             Ok("not created yet".into())
         }
@@ -81,10 +93,16 @@ pub fn run(paths: &Paths, network: bool) -> ExitCode {
 
     if network {
         let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
-        r.check("Discord API reachable", rt.block_on(async {
-            let start = Instant::now();
-            dn_api::RestClient::gateway_url_unauthenticated(None).await.map(|u| format!("{u} in {:?}", start.elapsed())).map_err(|e| e.to_string())
-        }));
+        r.check(
+            "Discord API reachable",
+            rt.block_on(async {
+                let start = Instant::now();
+                dn_api::RestClient::gateway_url_unauthenticated(None)
+                    .await
+                    .map(|u| format!("{u} in {:?}", start.elapsed()))
+                    .map_err(|e| e.to_string())
+            }),
+        );
         r.check("Discord gateway HELLO", rt.block_on(gateway_hello()));
     }
 
@@ -115,7 +133,9 @@ async fn gateway_hello() -> Result<String, String> {
     .await;
     handle.shutdown().await;
     match outcome {
-        Ok(Some(dn_gateway::FatalError::AuthenticationFailed)) => Ok(format!("connected; placeholder token rejected as expected ({:?})", start.elapsed())),
+        Ok(Some(dn_gateway::FatalError::AuthenticationFailed)) => {
+            Ok(format!("connected; placeholder token rejected as expected ({:?})", start.elapsed()))
+        }
         Ok(Some(other)) => Err(format!("unexpected gateway error: {other}")),
         Ok(None) => Err("gateway closed without a response".into()),
         Err(_) => Err("timed out".into()),

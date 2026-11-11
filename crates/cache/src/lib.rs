@@ -26,7 +26,10 @@ pub enum ConnStatus {
     Offline,
     Connecting,
     Connected,
-    Reconnecting { attempt: u32, delay_secs: u64 },
+    Reconnecting {
+        attempt: u32,
+        delay_secs: u64,
+    },
     Fatal(String),
 }
 
@@ -34,9 +37,18 @@ pub enum ConnStatus {
 pub enum VoiceConn {
     #[default]
     Idle,
-    Connecting { guild_id: Id, channel_id: Id },
-    Connected { guild_id: Id, channel_id: Id },
-    Reconnecting { guild_id: Id, channel_id: Id },
+    Connecting {
+        guild_id: Id,
+        channel_id: Id,
+    },
+    Connected {
+        guild_id: Id,
+        channel_id: Id,
+    },
+    Reconnecting {
+        guild_id: Id,
+        channel_id: Id,
+    },
     Failed(String),
 }
 
@@ -399,10 +411,11 @@ impl Store {
         let Some(gs) = self.guilds.get(&guild) else { return };
         for cid in gs.channel_ids.iter().chain(gs.thread_ids.iter()) {
             if let Some(last) = self.channels.get(cid).and_then(|c| c.last_message_id)
-                && !self.read_states.contains_key(cid) {
-                    self.read_states.insert(*cid, last);
-                    self.dirty_read_states.push((*cid, last));
-                }
+                && !self.read_states.contains_key(cid)
+            {
+                self.read_states.insert(*cid, last);
+                self.dirty_read_states.push((*cid, last));
+            }
         }
     }
 
@@ -426,23 +439,25 @@ impl Store {
                 self.private_channels.push(id);
             }
             if let Some(last) = c.last_message_id
-                && let std::collections::hash_map::Entry::Vacant(e) = self.read_states.entry(id) {
-                    e.insert(last);
-                    self.dirty_read_states.push((id, last));
-                }
-        } else if let Some(gid) = c.guild_id
-            && let Some(gs) = self.guilds.get_mut(&gid) {
-                if c.kind.is_thread() {
-                    let archived = c.thread_metadata.as_ref().is_some_and(|m| m.archived);
-                    if archived {
-                        gs.thread_ids.remove(&id);
-                    } else {
-                        gs.thread_ids.insert(id);
-                    }
-                } else if !gs.channel_ids.contains(&id) {
-                    gs.channel_ids.push(id);
-                }
+                && let std::collections::hash_map::Entry::Vacant(e) = self.read_states.entry(id)
+            {
+                e.insert(last);
+                self.dirty_read_states.push((id, last));
             }
+        } else if let Some(gid) = c.guild_id
+            && let Some(gs) = self.guilds.get_mut(&gid)
+        {
+            if c.kind.is_thread() {
+                let archived = c.thread_metadata.as_ref().is_some_and(|m| m.archived);
+                if archived {
+                    gs.thread_ids.remove(&id);
+                } else {
+                    gs.thread_ids.insert(id);
+                }
+            } else if !gs.channel_ids.contains(&id) {
+                gs.channel_ids.push(id);
+            }
+        }
         match self.channels.get_mut(&id) {
             // Keep last_message_id monotonic; CHANNEL_UPDATE may carry a stale one.
             Some(existing) => {
@@ -458,10 +473,11 @@ impl Store {
 
     fn remove_channel(&mut self, id: Id) {
         if let Some(c) = self.channels.remove(&id)
-            && let Some(gs) = c.guild_id.and_then(|g| self.guilds.get_mut(&g)) {
-                gs.channel_ids.retain(|x| *x != id);
-                gs.thread_ids.remove(&id);
-            }
+            && let Some(gs) = c.guild_id.and_then(|g| self.guilds.get_mut(&g))
+        {
+            gs.channel_ids.retain(|x| *x != id);
+            gs.thread_ids.remove(&id);
+        }
         self.private_channels.retain(|x| *x != id);
         self.messages.remove(&id);
     }
@@ -504,13 +520,14 @@ impl Store {
         let me = self.me();
         self.users.entry(m.author.id).or_insert_with(|| m.author.clone());
         if let (Some(gid), Some(member)) = (m.guild_id, &m.member)
-            && let Some(gs) = self.guilds.get_mut(&gid) {
-                gs.members.entry(m.author.id).or_insert_with(|| {
-                    let mut mm = member.clone();
-                    mm.user = None;
-                    mm
-                });
-            }
+            && let Some(gs) = self.guilds.get_mut(&gid)
+        {
+            gs.members.entry(m.author.id).or_insert_with(|| {
+                let mut mm = member.clone();
+                mm.user = None;
+                mm
+            });
+        }
         match self.channels.get_mut(&m.channel_id) {
             Some(c) => c.last_message_id = c.last_message_id.max(Some(m.id)),
             None if m.guild_id.is_none() => {
@@ -561,12 +578,8 @@ impl Store {
         if m.referenced_message.as_ref().is_some_and(|r| r.author.id == me) {
             return true;
         }
-        let roles = m
-            .guild_id
-            .and_then(|g| self.guilds.get(&g))
-            .and_then(|gs| gs.members.get(&me))
-            .map(|mm| mm.roles.as_slice())
-            .unwrap_or(&[]);
+        let roles =
+            m.guild_id.and_then(|g| self.guilds.get(&g)).and_then(|gs| gs.members.get(&me)).map(|mm| mm.roles.as_slice()).unwrap_or(&[]);
         m.mention_roles.iter().any(|r| roles.contains(r))
     }
 
@@ -585,9 +598,10 @@ impl Store {
             self.users.entry(m.author.id).or_insert_with(|| m.author.clone());
         }
         if let Some(newest) = page.iter().map(|m| m.id).max()
-            && let Some(c) = self.channels.get_mut(&channel) {
-                c.last_message_id = c.last_message_id.max(Some(newest));
-            }
+            && let Some(c) = self.channels.get_mut(&channel)
+        {
+            c.last_message_id = c.last_message_id.max(Some(newest));
+        }
         let cap = self.cap_for(channel);
         self.touch_loaded(channel);
         self.messages.entry(channel).or_default().merge_page(page, before, reached_start, cap);

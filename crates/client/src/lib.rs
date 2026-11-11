@@ -126,7 +126,12 @@ pub(crate) struct Backend {
 }
 
 /// Start the backend on `rt`. It runs until `Command::Shutdown` or the UI side of the bus is dropped.
-pub fn start(rt: &tokio::runtime::Handle, cfg: BackendConfig, link: BackendLink, commands: mpsc::UnboundedReceiver<Command>) -> tokio::task::JoinHandle<()> {
+pub fn start(
+    rt: &tokio::runtime::Handle,
+    cfg: BackendConfig,
+    link: BackendLink,
+    commands: mpsc::UnboundedReceiver<Command>,
+) -> tokio::task::JoinHandle<()> {
     rt.spawn(async move {
         let (gw_tx, gw_rx) = mpsc::unbounded_channel();
         let (internal_tx, internal_rx) = mpsc::unbounded_channel();
@@ -354,7 +359,10 @@ impl Backend {
                 if join_gen == self.voice_join_gen {
                     let still_connecting = matches!(self.store().voice.conn, dn_cache::VoiceConn::Connecting { .. });
                     if still_connecting {
-                        self.voice_failed("Timed out waiting for Discord's voice server. Check that the bot has Connect permission.".into()).await;
+                        self.voice_failed(
+                            "Timed out waiting for Discord's voice server. Check that the bot has Connect permission.".into(),
+                        )
+                        .await;
                     }
                 }
             }
@@ -396,14 +404,16 @@ impl Backend {
     pub(crate) async fn stop_session(&mut self) {
         self.flush().await;
         if self.voice_pending.take().is_some()
-            && let Some(v) = &self.voice {
-                v.disconnect().await;
-            }
+            && let Some(v) = &self.voice
+        {
+            v.disconnect().await;
+        }
         if let Some(s) = self.session.take()
-            && let Some(g) = s.gateway {
-                // Bounded: a hung socket must not block account switching or exit.
-                let _ = tokio::time::timeout(Duration::from_secs(3), g.shutdown()).await;
-            }
+            && let Some(g) = s.gateway
+        {
+            // Bounded: a hung socket must not block account switching or exit.
+            let _ = tokio::time::timeout(Duration::from_secs(3), g.shutdown()).await;
+        }
         self.session_gen += 1;
         self.pending_sends.clear();
         self.last_fetch.clear();
@@ -467,7 +477,10 @@ impl Backend {
                 Ok(g) => {
                     if g.session_start_limit.remaining == 0 {
                         let wait = g.session_start_limit.reset_after;
-                        self.link.toast(format!("Discord's daily connection limit for this bot is used up; it resets in {} min.", wait / 60_000 + 1), true);
+                        self.link.toast(
+                            format!("Discord's daily connection limit for this bot is used up; it resets in {} min.", wait / 60_000 + 1),
+                            true,
+                        );
                     }
                     Some(g.url)
                 }
@@ -557,7 +570,8 @@ impl Backend {
         let _ = self.accounts.lock().await.mark_credentials_invalid(account_id, true);
         {
             let mut store = self.store();
-            store.session.conn = ConnStatus::Fatal("Discord rejected the bot token. Reset it in the Developer Portal and add the account again.".into());
+            store.session.conn =
+                ConnStatus::Fatal("Discord rejected the bot token. Reset it in the Developer Portal and add the account again.".into());
         }
         self.refresh_accounts_view().await;
         self.link.toast("Discord rejected the bot token.", true);
@@ -747,7 +761,6 @@ impl Backend {
             });
         }
     }
-
 
     fn prune(&self) {
         let Some(storage) = self.storage.clone() else { return };

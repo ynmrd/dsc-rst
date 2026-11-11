@@ -66,9 +66,12 @@ pub fn populate(store: &SharedStore) {
                 "guilds": [{ "id": GUILD_A.to_string(), "unavailable": true }, { "id": GUILD_B.to_string(), "unavailable": true }],
                 "session_id": "demo", "resume_gateway_url": "wss://demo.invalid", "application": { "id": "900000000000000002", "flags": 0 } }),
     ));
-    let members: Vec<serde_json::Value> = std::iter::once(json!({ "user": { "id": ME.to_string(), "username": "native-bot", "bot": true }, "roles": [] }))
-        .chain(PEOPLE.iter().enumerate().map(|(i, (id, u, g))| json!({ "user": user_json(*id, u, g), "roles": if i < 2 { vec!["830000000000000002"] } else { vec![] } })))
-        .collect();
+    let members: Vec<serde_json::Value> =
+        std::iter::once(json!({ "user": { "id": ME.to_string(), "username": "native-bot", "bot": true }, "roles": [] }))
+            .chain(PEOPLE.iter().enumerate().map(
+                |(i, (id, u, g))| json!({ "user": user_json(*id, u, g), "roles": if i < 2 { vec!["830000000000000002"] } else { vec![] } }),
+            ))
+            .collect();
     let presences: Vec<serde_json::Value> = PEOPLE
         .iter()
         .enumerate()
@@ -191,12 +194,11 @@ pub fn populate(store: &SharedStore) {
     s.session.ready = true;
 }
 
-
-
 /// Minimal local command handling so the demo is interactive.
 pub async fn serve(link: BackendLink, mut commands: tokio::sync::mpsc::UnboundedReceiver<Command>) {
     while let Some(cmd) = commands.recv().await {
-        let me = User { id: Id(ME), username: "native-bot".into(), global_name: Some("Native Bot".into()), bot: true, ..Default::default() };
+        let me =
+            User { id: Id(ME), username: "native-bot".into(), global_name: Some("Native Bot".into()), bot: true, ..Default::default() };
         match cmd {
             Command::Shutdown => break,
             Command::SendMessage { channel_id, content, reply_to, .. } => {
@@ -219,7 +221,13 @@ pub async fn serve(link: BackendLink, mut commands: tokio::sync::mpsc::Unbounded
                 store.apply(&Dispatch::MessageCreate(Box::new(m)));
             }
             Command::EditMessage { channel_id, message_id, content } => {
-                let u = MessageUpdate { id: message_id, channel_id, content: Some(content), edited_timestamp: Some(ts(Utc::now().timestamp_millis())), ..Default::default() };
+                let u = MessageUpdate {
+                    id: message_id,
+                    channel_id,
+                    content: Some(content),
+                    edited_timestamp: Some(ts(Utc::now().timestamp_millis())),
+                    ..Default::default()
+                };
                 link.store.lock().apply(&Dispatch::MessageUpdate(Box::new(u)));
             }
             Command::DeleteMessage { channel_id, message_id } => {
@@ -240,11 +248,28 @@ pub async fn serve(link: BackendLink, mut commands: tokio::sync::mpsc::Unbounded
                 let q = req.query.to_lowercase();
                 let hits: Vec<Message> = {
                     let s = link.store.lock();
-                    s.messages.values().flat_map(|cm| cm.messages.iter()).filter(|m| m.content.to_lowercase().contains(&q)).take(25).cloned().collect()
+                    s.messages
+                        .values()
+                        .flat_map(|cm| cm.messages.iter())
+                        .filter(|m| m.content.to_lowercase().contains(&q))
+                        .take(25)
+                        .cloned()
+                        .collect()
                 };
-                link.emit(UiEvent::SearchResults { request: Box::new(req), total: hits.len() as u64, messages: hits, source: SearchSource::Local, note: Some("Demo data".into()) });
+                link.emit(UiEvent::SearchResults {
+                    request: Box::new(req),
+                    total: hits.len() as u64,
+                    messages: hits,
+                    source: SearchSource::Local,
+                    note: Some("Demo data".into()),
+                });
             }
-            Command::OpenChannel { .. } | Command::Typing { .. } | Command::FocusChanged { .. } | Command::SettingsChanged | Command::RequestMembers { .. } | Command::FetchProfile { .. } => {}
+            Command::OpenChannel { .. }
+            | Command::Typing { .. }
+            | Command::FocusChanged { .. }
+            | Command::SettingsChanged
+            | Command::RequestMembers { .. }
+            | Command::FetchProfile { .. } => {}
             other => link.toast(format!("Not available in demo mode ({})", command_name(&other)), false),
         }
         link.repaint.now();

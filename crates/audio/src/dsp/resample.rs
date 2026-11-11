@@ -23,14 +23,7 @@ impl Resampler {
             let cutoff = 0.45 * f64::from(out_rate);
             let fs = f64::from(in_rate);
             // Q values of the two sections of a 4th-order Butterworth.
-            (0..channels)
-                .map(|_| {
-                    [
-                        Biquad::lowpass(fs, cutoff, 0.541_196),
-                        Biquad::lowpass(fs, cutoff, 1.306_563),
-                    ]
-                })
-                .collect()
+            (0..channels).map(|_| [Biquad::lowpass(fs, cutoff, 0.541_196), Biquad::lowpass(fs, cutoff, 1.306_563)]).collect()
         } else {
             Vec::new()
         };
@@ -121,9 +114,7 @@ impl Resampler {
 
 #[inline]
 fn catmull_rom(p0: f32, p1: f32, p2: f32, p3: f32, t: f32) -> f32 {
-    p1 + 0.5
-        * t
-        * (p2 - p0 + t * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3 + t * (3.0 * (p1 - p2) + p3 - p0)))
+    p1 + 0.5 * t * (p2 - p0 + t * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3 + t * (3.0 * (p1 - p2) + p3 - p0)))
 }
 
 /// Transposed direct-form II biquad.
@@ -199,11 +190,7 @@ mod tests {
     fn downsample_stereo_48k_to_44k1() {
         let left = sine(1000.0, 48_000, 0.5, 48_000);
         let right = sine(3000.0, 48_000, 0.5, 48_000);
-        let input: Vec<f32> = left
-            .iter()
-            .zip(&right)
-            .flat_map(|(l, r)| [*l, *r])
-            .collect();
+        let input: Vec<f32> = left.iter().zip(&right).flat_map(|(l, r)| [*l, *r]).collect();
         let mut rs = Resampler::new(48_000, 44_100, 2);
         // Odd chunk sizes, as delivered by real device callbacks.
         let out = run_chunked(&mut rs, &input, 333);

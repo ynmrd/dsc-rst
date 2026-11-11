@@ -58,10 +58,7 @@ impl Default for AudioConfig {
             output_device: None,
             input_gain: 1.0,
             output_volume: 1.0,
-            mode: InputMode::VoiceActivity {
-                threshold_db: -50.0,
-                auto: true,
-            },
+            mode: InputMode::VoiceActivity { threshold_db: -50.0, auto: true },
             noise_suppression: true,
             auto_gain: false,
         }
@@ -95,22 +92,17 @@ pub fn output_devices() -> Vec<DeviceInfo> {
 }
 
 fn enumerate(dir: Direction) -> Vec<DeviceInfo> {
-    let worker = std::thread::Builder::new()
-        .name("dn-audio-enum".into())
-        .spawn(move || {
-            let host = cpal::default_host();
-            let default = default_device(&host, dir).and_then(|d| device_name(&d));
-            let mut out: Vec<DeviceInfo> = Vec::new();
-            for name in list_devices(&host, dir).iter().filter_map(device_name) {
-                if !out.iter().any(|d| d.name == name) {
-                    out.push(DeviceInfo {
-                        is_default: default.as_deref() == Some(name.as_str()),
-                        name,
-                    });
-                }
+    let worker = std::thread::Builder::new().name("dn-audio-enum".into()).spawn(move || {
+        let host = cpal::default_host();
+        let default = default_device(&host, dir).and_then(|d| device_name(&d));
+        let mut out: Vec<DeviceInfo> = Vec::new();
+        for name in list_devices(&host, dir).iter().filter_map(device_name) {
+            if !out.iter().any(|d| d.name == name) {
+                out.push(DeviceInfo { is_default: default.as_deref() == Some(name.as_str()), name });
             }
-            out
-        });
+        }
+        out
+    });
     worker.ok().and_then(|h| h.join().ok()).unwrap_or_default()
 }
 
@@ -120,10 +112,7 @@ mod tests {
 
     use super::*;
 
-    fn wait_for_event(
-        engine: &AudioEngine,
-        pred: impl Fn(&AudioEvent) -> bool,
-    ) -> Option<AudioEvent> {
+    fn wait_for_event(engine: &AudioEngine, pred: impl Fn(&AudioEvent) -> bool) -> Option<AudioEvent> {
         let rx = engine.events();
         let deadline = Instant::now() + Duration::from_secs(10);
         while let Some(left) = deadline.checked_duration_since(Instant::now()) {
@@ -153,10 +142,7 @@ mod tests {
         engine.set_config(AudioConfig {
             input_device: Some("definitely-missing-mic".into()),
             output_device: Some("definitely-missing-speaker".into()),
-            mode: InputMode::VoiceActivity {
-                threshold_db: -42.0,
-                auto: false,
-            },
+            mode: InputMode::VoiceActivity { threshold_db: -42.0, auto: false },
             ..AudioConfig::default()
         });
         assert_eq!(engine.effective_threshold_db(), -42.0);
@@ -165,16 +151,9 @@ mod tests {
         engine.start_playback();
         // Headless machines report an error; machines with a (virtual) device start it and
         // also report that the configured name was not found.
-        let ev = wait_for_event(&engine, |e| {
-            matches!(
-                e,
-                AudioEvent::Error(_) | AudioEvent::InputStarted(_) | AudioEvent::OutputStarted(_)
-            )
-        });
-        assert!(
-            ev.is_some(),
-            "engine must report the outcome of opening devices"
-        );
+        let ev =
+            wait_for_event(&engine, |e| matches!(e, AudioEvent::Error(_) | AudioEvent::InputStarted(_) | AudioEvent::OutputStarted(_)));
+        assert!(ev.is_some(), "engine must report the outcome of opening devices");
 
         engine.set_ptt(true);
         engine.set_muted(true);
@@ -198,10 +177,7 @@ mod tests {
         let engine = AudioEngine::new(AudioConfig::default());
         let mut reader = engine.capture_frames();
         let mut writer = engine.playback_writer();
-        engine.set_config(AudioConfig {
-            output_device: Some("other".into()),
-            ..AudioConfig::default()
-        });
+        engine.set_config(AudioConfig { output_device: Some("other".into()), ..AudioConfig::default() });
         writer.write(&[0.25; 1920]);
         assert!(writer.buffered_ms() > 19.0);
         let mut frame = [0.0; FRAME_SAMPLES];
