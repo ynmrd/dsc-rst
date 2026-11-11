@@ -257,12 +257,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
 
 [[package]]
-name = "anyhow"
-version = "1.0.104"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
 name = "anymap3"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1488,13 +1482,25 @@ dependencies = [
 name = "discord-native"
 version = "0.1.0"
 dependencies = [
- "anyhow",
+ "chrono",
+ "crossbeam-channel",
+ "dn-api",
+ "dn-audio",
+ "dn-auth",
+ "dn-cache",
  "dn-client",
  "dn-core",
  "dn-diagnostics",
+ "dn-gateway",
+ "dn-media",
  "dn-settings",
+ "dn-storage",
  "dn-ui",
  "eframe",
+ "egui",
+ "parking_lot 0.12.5",
+ "tempfile",
+ "tokio",
  "tracing",
  "tray-icon",
  "windows-sys 0.61.2",
@@ -1524,6 +1530,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e0e367e4e7da84520dedcac1901e4da967309406d1e51017ae1abfb97adbd38"
 dependencies = [
  "bitflags 2.13.2",
+ "block2 0.6.2",
+ "libc",
  "objc2 0.6.5",
 ]
 
@@ -1573,7 +1581,6 @@ dependencies = [
  "crossbeam-channel",
  "nnnoiseless",
  "parking_lot 0.12.5",
- "thiserror 2.0.21",
  "tracing",
 ]
 
@@ -1714,9 +1721,12 @@ dependencies = [
 name = "dn-notifications"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-channel",
  "dn-core",
  "notify-rust",
+ "tauri-winrt-notification",
  "tracing",
+ "winreg",
 ]
 
 [[package]]
@@ -1750,9 +1760,17 @@ name = "dn-ui"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "crossbeam-channel",
+ "dn-cache",
  "dn-core",
+ "dn-diagnostics",
+ "dn-media",
+ "dn-messaging",
+ "dn-settings",
  "eframe",
  "egui",
+ "open",
+ "rfd",
  "tracing",
 ]
 
@@ -4464,6 +4482,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-foundation 0.3.2",
+ "objc2-uniform-type-identifiers 0.3.2",
 ]
 
 [[package]]
@@ -4734,7 +4753,7 @@ dependencies = [
  "objc2-link-presentation",
  "objc2-quartz-core 0.2.2",
  "objc2-symbols",
- "objc2-uniform-type-identifiers",
+ "objc2-uniform-type-identifiers 0.2.2",
  "objc2-user-notifications",
 ]
 
@@ -4759,6 +4778,16 @@ dependencies = [
  "block2 0.5.1",
  "objc2 0.5.3",
  "objc2-foundation 0.2.2",
+]
+
+[[package]]
+name = "objc2-uniform-type-identifiers"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7902ac02859fc1f7045f8b598c63f1ae0cc7efeaa06a9bc9f3d9a3c955974fa4"
+dependencies = [
+ "objc2 0.6.5",
+ "objc2-foundation 0.3.2",
 ]
 
 [[package]]
@@ -5888,6 +5917,31 @@ checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
 dependencies = [
  "hmac",
  "subtle",
+]
+
+[[package]]
+name = "rfd"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4b9d4857b10297ffb0f64cae711e983a7aeaee561848d56d429d3858bd8ed93"
+dependencies = [
+ "block2 0.6.2",
+ "dispatch2",
+ "js-sys",
+ "libc",
+ "log",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-core-foundation",
+ "objc2-foundation 0.3.2",
+ "objc2-uniform-type-identifiers 0.3.2",
+ "percent-encoding",
+ "pollster",
+ "raw-window-handle",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

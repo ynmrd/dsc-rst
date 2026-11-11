@@ -371,7 +371,7 @@ fn show_job(ui: &mut Ui, job: LayoutJob, spans: Vec<Span>, rc: &mut RenderCtx) {
         }
     }
 
-    let hovered_char = resp.hover_pos().map(|p| galley.cursor_from_pos(p - pos).index);
+    let hovered_char = resp.hover_pos().map(|p| galley.cursor_from_pos(p - pos).index.0);
     if let Some(ci) = hovered_char {
         if spans.iter().any(|s| s.chars.contains(&ci) && !matches!(s.kind, SpanKind::Emoji { .. })) {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -382,7 +382,7 @@ fn show_job(ui: &mut Ui, job: LayoutJob, spans: Vec<Span>, rc: &mut RenderCtx) {
         }
     }
     if resp.clicked() {
-        if let Some(ci) = resp.interact_pointer_pos().map(|p| galley.cursor_from_pos(p - pos).index) {
+        if let Some(ci) = resp.interact_pointer_pos().map(|p| galley.cursor_from_pos(p - pos).index.0) {
             // Spoilers first: clicking hidden text reveals it instead of following links.
             if let Some(Span { kind: SpanKind::Spoiler(id), .. }) =
                 spans.iter().find(|s| s.chars.contains(&ci) && matches!(s.kind, SpanKind::Spoiler(_)))

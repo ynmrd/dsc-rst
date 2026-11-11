@@ -156,7 +156,7 @@ mod tests {
         let rgb = RgbImage::from_pixel(32, 32, Rgb([200, 100, 50]));
         let out = decode(&encode(&DynamicImage::ImageRgb8(rgb), ImageFormat::Jpeg), 16).unwrap();
         assert_eq!((out.width, out.height), (16, 16));
-        assert!(out.rgba.chunks_exact(4).all(|p| p[3] == 255));
+        assert!(out.rgba.as_chunks::<4>().0.iter().all(|p| p[3] == 255));
     }
 
     #[test]
@@ -168,7 +168,7 @@ mod tests {
             }
         }
         let out = decode(&encode(&DynamicImage::ImageRgba8(img), ImageFormat::Png), 10).unwrap();
-        let visible: Vec<_> = out.rgba.chunks_exact(4).filter(|p| p[3] > 0).collect();
+        let visible: Vec<_> = out.rgba.as_chunks::<4>().0.iter().filter(|p| p[3] > 0).collect();
         assert!(!visible.is_empty());
         assert!(visible.iter().all(|p| p[..3].iter().all(|&c| c >= 254)), "{visible:?}");
     }
@@ -198,10 +198,23 @@ mod tests {
 
     #[test]
     fn oversized_dimensions_are_rejected_without_decoding() {
-        // Valid 1x1 PNG with the IHDR size rewritten to 20000x20000.
+        // Valid 1x1 PNG with the IHDR size rewritten to 20000x20000 (and its CRC fixed up).
         let mut png = solid(1, 1, [0, 0, 0, 255]);
         png[16..20].copy_from_slice(&20_000u32.to_be_bytes());
         png[20..24].copy_from_slice(&20_000u32.to_be_bytes());
+        let crc = crc32(&png[12..29]);
+        png[29..33].copy_from_slice(&crc.to_be_bytes());
         assert!(matches!(decode(&png, 100), Err(MediaError::Dimensions(20_000, 20_000))));
+    }
+
+    fn crc32(data: &[u8]) -> u32 {
+        let mut crc = !0u32;
+        for &byte in data {
+            crc ^= u32::from(byte);
+            for _ in 0..8 {
+                crc = if crc & 1 == 1 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 };
+            }
+        }
+        !crc
     }
 }

@@ -93,6 +93,8 @@ pub struct Session {
     pub accounts: Vec<AccountView>,
     pub linked: Option<LinkedUser>,
     pub needs_onboarding: bool,
+    /// Offline demo data (no Discord connection); the UI shows a banner.
+    pub demo: bool,
     pub audio_inputs: Vec<String>,
     pub audio_outputs: Vec<String>,
 }
