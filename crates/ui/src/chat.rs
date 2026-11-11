@@ -66,7 +66,7 @@ fn header(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id, p: 
     hui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         if c.guild_id.is_some() {
             let out = egui::TextEdit::singleline(&mut app.st.search.query)
-                .id(egui::Id::new("search-box"))
+                .id(egui::Id::unique("search-box"))
                 .hint_text("Search")
                 .desired_width(180.0)
                 .show(ui);
@@ -125,7 +125,7 @@ pub fn start_search(app: &mut DiscordApp, store: &Store, offset: u32, channel_on
 fn pins_popup(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id, header: Rect, p: &Palette) {
     let mut close = false;
     let mut jump = None;
-    egui::Area::new(egui::Id::new("pins"))
+    egui::Area::new(egui::Id::unique("pins"))
         .fixed_pos(egui::pos2(header.right() - 440.0, header.bottom() + 4.0))
         .order(egui::Order::Foreground)
         .show(ui.ctx(), |ui| {
@@ -398,7 +398,7 @@ fn message_list(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: I
     }
     list.anchor = first_visible;
     let max_offset = (output.content_size.y - output.inner_rect.height()).max(0.0);
-    list.at_bottom = output.state.offset.y >= max_offset - 4.0;
+    list.at_bottom = output.state.offset().y >= max_offset - 4.0;
     let at_bottom = list.at_bottom;
 
     // Load older history when near the top.
@@ -418,14 +418,14 @@ fn message_list(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: I
             }
         }
     }
-    if has_gap || (!at_bottom && max_offset - output.state.offset.y > 1500.0) {
+    if has_gap || (!at_bottom && max_offset - output.state.offset().y > 1500.0) {
         let r = output.inner_rect;
         let bar = Rect::from_min_size(egui::pos2(r.left() + 16.0, r.bottom() - 36.0), vec2(r.width() - 32.0, 30.0));
         ui.painter().rect_filled(bar, CornerRadius::same(6), p.accent);
         ui.painter().text(bar.left_center() + vec2(12.0, 0.0), egui::Align2::LEFT_CENTER, "You're viewing older messages", egui::FontId::proportional(13.0), Color32::WHITE);
         let jr = Rect::from_min_size(egui::pos2(bar.right() - 130.0, bar.top()), vec2(130.0, 30.0));
         ui.painter().text(jr.center(), egui::Align2::CENTER_CENTER, "Jump to Present ↓", crate::theme::bold(13.0), Color32::WHITE);
-        if ui.interact(jr, egui::Id::new(("jump", channel)), Sense::click()).clicked() {
+        if ui.interact(jr, egui::Id::unique(("jump", channel)), Sense::click()).clicked() {
             if has_gap {
                 app.link.send(Command::JumpToPresent { channel_id: channel });
             }
@@ -584,11 +584,11 @@ fn composer(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id, p
                 }
             });
         }
-        let input_id = egui::Id::new(("composer", channel));
+        let input_id = egui::Id::unique(("composer", channel));
         let mut text = app.st.drafts.get(&channel).cloned().unwrap_or_default();
 
         // Completion state from last frame's cursor.
-        let cursor_char = egui::TextEdit::load_state(&ctx, input_id).and_then(|s| s.cursor.char_range()).map(|r| r.primary.index);
+        let cursor_char = egui::TextEdit::load_state(&ctx, input_id).and_then(|s| s.cursor.char_range()).map(|r| r.primary.index.0);
         let cursor_byte = cursor_char.map(|c| text.char_indices().nth(c).map(|(b, _)| b).unwrap_or(text.len()));
         let token = cursor_byte.and_then(|b| compose::completion_at(&text, b));
         let cands = token.as_ref().map(|t| completions(store, channel, &t.kind, &t.query)).unwrap_or_default();
@@ -677,7 +677,7 @@ fn composer(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id, p
         if popup_open && accept.is_none() {
             let sel = app.st.composer(channel).completion_selected;
             let r = resp.response.rect;
-            egui::Area::new(egui::Id::new("completion"))
+            egui::Area::new(egui::Id::unique("completion"))
                 .fixed_pos(egui::pos2(r.left(), r.top() - 8.0 - cands.len() as f32 * 30.0 - 16.0))
                 .order(egui::Order::Foreground)
                 .show(&ctx, |ui| {
@@ -759,7 +759,7 @@ fn forum_view(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id,
                     ui.label(RichText::new(&name).strong().color(p.text_strong));
                     ui.label(RichText::new(format!("{} messages", count.unwrap_or(0))).color(p.muted).size(12.0));
                 });
-                if ui.interact(r.response.rect, egui::Id::new(("post", id)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                if ui.interact(r.response.rect, egui::Id::unique(("post", id)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                     app.open_channel(store, id);
                 }
                 ui.add_space(6.0);
@@ -809,7 +809,7 @@ pub fn search_panel(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store) {
                 let snippet: String = m.content.chars().take(280).collect();
                 ui.label(snippet);
             });
-            if ui.interact(r.response.rect, egui::Id::new(("sr", m.id)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+            if ui.interact(r.response.rect, egui::Id::unique(("sr", m.id)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                 jump = Some((m.channel_id, m.id));
             }
             ui.add_space(4.0);
@@ -832,7 +832,7 @@ pub fn emoji_picker(app: &mut DiscordApp, ctx: &egui::Context, store: &Store, p:
     let mut chosen: Option<Emoji> = None;
     let mut close = false;
     let screen = ctx.content_rect();
-    egui::Area::new(egui::Id::new("emoji-picker"))
+    egui::Area::new(egui::Id::unique("emoji-picker"))
         .fixed_pos(egui::pos2(screen.right() - 420.0, screen.bottom() - 520.0))
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {

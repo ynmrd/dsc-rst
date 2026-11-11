@@ -9,6 +9,5 @@ license.workspace = true
 cpal.workspace = true
 nnnoiseless.workspace = true
 parking_lot.workspace = true
-thiserror.workspace = true
 tracing.workspace = true
 crossbeam-channel.workspace = true

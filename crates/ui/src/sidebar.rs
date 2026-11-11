@@ -94,7 +94,8 @@ fn guild_channels(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, guild: I
             }
             if collapsed {
                 // Collapsed categories still show the selected channel and unread ones.
-                for c in channels.iter().filter(|c| app.st.selected_channel == Some(c.id) || store.is_unread(c.id)) {
+                let visible: Vec<Channel> = channels.iter().filter(|c| app.st.selected_channel == Some(c.id) || store.is_unread(c.id)).cloned().collect();
+                for c in &visible {
                     channel_row(app, ui, store, c, p, 0.0);
                 }
                 continue;
