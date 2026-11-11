@@ -198,10 +198,23 @@ mod tests {
 
     #[test]
     fn oversized_dimensions_are_rejected_without_decoding() {
-        // Valid 1x1 PNG with the IHDR size rewritten to 20000x20000.
+        // Valid 1x1 PNG with the IHDR size rewritten to 20000x20000 (and its CRC fixed up).
         let mut png = solid(1, 1, [0, 0, 0, 255]);
         png[16..20].copy_from_slice(&20_000u32.to_be_bytes());
         png[20..24].copy_from_slice(&20_000u32.to_be_bytes());
+        let crc = crc32(&png[12..29]);
+        png[29..33].copy_from_slice(&crc.to_be_bytes());
         assert!(matches!(decode(&png, 100), Err(MediaError::Dimensions(20_000, 20_000))));
+    }
+
+    fn crc32(data: &[u8]) -> u32 {
+        let mut crc = !0u32;
+        for &byte in data {
+            crc ^= u32::from(byte);
+            for _ in 0..8 {
+                crc = if crc & 1 == 1 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 };
+            }
+        }
+        !crc
     }
 }
