@@ -22,6 +22,7 @@ use dn_settings::{Paths, Settings};
 use dn_storage::{Storage, StorageHandle};
 
 pub use desktop::set_autostart;
+pub use voice_glue::{MAX_VOICE_RETRIES, VoiceTimings};
 
 /// Where the backend talks to. Production uses Discord; tests point it at local mocks.
 pub struct BackendConfig {
@@ -36,6 +37,7 @@ pub struct BackendConfig {
     pub oauth_api_base: String,
     /// Shown once at startup (e.g. credential store unavailable).
     pub startup_warning: Option<String>,
+    pub voice_timings: VoiceTimings,
 }
 
 impl BackendConfig {
@@ -63,6 +65,7 @@ impl BackendConfig {
             audio: true,
             oauth_api_base: dn_core::API_BASE.to_string(),
             startup_warning,
+            voice_timings: VoiceTimings::default(),
         }
     }
 }
@@ -78,6 +81,7 @@ pub(crate) enum Internal {
     NotificationClicked(Id),
     AudioEvent(String, bool),
     VoiceTimeout(u64),
+    VoiceRejoin(u64),
     VoiceConnectFailed(String),
 }
 
@@ -357,7 +361,8 @@ impl Backend {
             }
             Internal::VoiceTimeout(join_gen) => {
                 if join_gen == self.voice_join_gen {
-                    let still_connecting = matches!(self.store().voice.conn, dn_cache::VoiceConn::Connecting { .. });
+                    let still_connecting =
+                        matches!(self.store().voice.conn, dn_cache::VoiceConn::Connecting { .. } | dn_cache::VoiceConn::Reconnecting { .. });
                     if still_connecting {
                         self.voice_failed(
                             "Timed out waiting for Discord's voice server. Check that the bot has Connect permission.".into(),
@@ -367,6 +372,7 @@ impl Backend {
                 }
             }
             Internal::VoiceConnectFailed(e) => self.voice_failed(e).await,
+            Internal::VoiceRejoin(join_gen) => self.rejoin_voice(join_gen),
         }
     }
 
@@ -659,6 +665,27 @@ impl Backend {
                 let updated = self.store().channel_messages(u.channel_id).and_then(|cm| cm.get(u.id).cloned());
                 if let Some(m) = updated {
                     self.persist_buffer.push(m);
+                } else if let Some(m) = self.persist_buffer.iter_mut().rev().find(|m| m.id == u.id) {
+                    // Created moments ago and not flushed yet.
+                    u.apply_to(m);
+                } else if let Some(storage) = self.storage.clone() {
+                    // Not in memory: patch the cached copy so local search stays current.
+                    let u = (**u).clone();
+                    tokio::spawn(async move {
+                        let r = storage
+                            .call(move |s| {
+                                let found = s.load_messages(u.channel_id, Some(Id(u.id.0.saturating_add(1))), 1)?;
+                                if let Some(mut m) = found.into_iter().find(|m| m.id == u.id) {
+                                    u.apply_to(&mut m);
+                                    s.update_message(&m)?;
+                                }
+                                Ok::<_, dn_storage::StorageError>(())
+                            })
+                            .await;
+                        if let Ok(Err(e)) = r {
+                            tracing::debug!("patching cached message failed: {e}");
+                        }
+                    });
                 }
             }
             Dispatch::MessageDelete(e) => self.delete_buffer.push((e.channel_id, vec![e.id])),
