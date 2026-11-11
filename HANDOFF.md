@@ -1,6 +1,6 @@
 # HANDOFF — инструкция для следующего чата
 
-Документ для продолжения работы в новом чате или другим агентом. Последнее обновление: 2026-11-11 ~19:55 UTC, ветка `hoplite/olous-67e0f2c3`.
+Документ для продолжения работы в новом чате или другим агентом. Последнее обновление: 2026-11-11 ~21:50 UTC. Ветка по умолчанию в репозитории — `hoplite/olous-67e0f2c3`; работа второй сессии лежит в ветке `hoplite/beroia-c64bcbde` и оформлена PR в `hoplite/olous-67e0f2c3` (напрямую в ветку по умолчанию не пушить).
 
 **Задача:** нативный клиент Discord на Rust для Windows 10/11 по ТЗ из [`docs/ORIGINAL_PROMPT.md`](docs/ORIGINAL_PROMPT.md). Используются только официальные интерфейсы Discord, без user-token и self-bot.
 
@@ -23,12 +23,12 @@
 
 ## 2. Текущее состояние
 
-**Весь код написан, все 16 крейтов собираются.** `cargo fmt --check` и `cargo clippy --workspace --all-targets -D warnings` чистые.
+**Весь код написан, все 16 крейтов собираются.** `cargo fmt --check` и `cargo clippy --workspace --all-targets -D warnings` чистые. Вторая сессия: `cargo test --workspace` — 406 тестов пройдено, 0 упало, 2 live-теста `#[ignore]` (запускалось в sandbox).
 
 | Крейт | Что делает | Тесты (запускал сам, все зелёные) |
 |---|---|---|
-| dn-core | модель Discord v10, Id, permissions, CDN, Dispatch | 18 |
-| dn-api | REST + rate limit по бакетам, 429/5xx-ретраи, multipart, поиск, pins | 29 (+1 `#[ignore]` live) |
+| dn-core | модель Discord v10, Id, permissions, CDN, Dispatch | 19 (+ форумные теги) |
+| dn-api | REST + rate limit по бакетам, 429/5xx-ретраи, multipart, поиск, pins, посты в форумах | 32 (+1 `#[ignore]` live) |
 | dn-gateway | gateway v10: heartbeat/zombie, identify/resume, zlib-stream, backoff, fatal-коды | 16 (+1 `#[ignore]` live) |
 | dn-auth | OAuth2 PKCE loopback, AccountManager, keyring, refresh/revoke | 60 |
 | dn-storage | SQLite WAL + FTS5, read states, prune, восстановление при повреждении | 24 + бенчмарк |
@@ -39,8 +39,8 @@
 | dn-notifications | правила, rate limit, Windows toasts с кликом | 33 (по отчёту сабагента) |
 | dn-audio | CPAL, VAD/PTT, RNNoise, AGC, ресемплинг, восстановление устройства | 33 (по отчёту сабагента) |
 | dn-voice | songbird driver, mic source, микшер, speaking | 21 (по отчёту сабагента) |
-| dn-client | backend: сессии, gateway, REST-команды, SQLite, уведомления, голос, автозапуск | 1 + **3 e2e** (мок REST + мок WS-gateway: полная сессия, отклонённый токен, отказ user-token) |
-| dn-ui | egui 0.37: виртуализированный чат, markdown, sidebar, members, modals, settings, onboarding, stress test | 7 |
+| dn-client | backend: сессии, gateway, REST-команды, SQLite, уведомления, голос, автозапуск | 1 + **6 e2e** (мок REST + мок WS-gateway: полная сессия, отклонённый токен, отказ user-token, voice rejoin, правки вне окна, посты в форумах) |
+| dn-ui | egui 0.37: виртуализированный чат, markdown, sidebar, members, modals, settings, onboarding, stress test, форма поста в форуме, sticker picker | 7 |
 | discord-native (app) | main, `--demo`, `--self-check [--network]`, трей (Win), глобальный PTT (Win), single instance, иконка | 3 |
 
 ### Что реально проверено вживую

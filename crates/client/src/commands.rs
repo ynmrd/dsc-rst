@@ -3,7 +3,7 @@
 
 use std::time::{Duration, Instant};
 
-use dn_api::{ApiError, CreateMessage, FileUpload, MessagePage, SearchOutcome, SearchQuery};
+use dn_api::{ApiError, CreateForumPost, CreateMessage, FileUpload, MessagePage, SearchOutcome, SearchQuery};
 use dn_cache::bus::{Command, SearchRequest, SearchSource, UiEvent};
 use dn_core::{Dispatch, Id, Message, MessageDelete, Presence, PresenceUser, Status};
 use dn_gateway::{GatewayCommand, Intents, PresenceUpdate};
@@ -194,6 +194,13 @@ impl Backend {
                         Err(e) => link.toast(format!("Couldn't create the thread: {e}"), true),
                     }
                 });
+            }
+            Command::CreateForumPost { channel_id, title, content, tags, files, sticker_ids } => {
+                if self.rest().is_none() {
+                    self.link.emit(UiEvent::ForumPostResult { channel_id, result: Err("Not connected to Discord.".into()) });
+                } else {
+                    self.create_forum_post(channel_id, title, content, tags, files, sticker_ids);
+                }
             }
             Command::DownloadTo { url, path } => {
                 self.spawn_rest(move |rest, link| async move {
@@ -410,6 +417,44 @@ impl Backend {
         });
     }
 
+    fn create_forum_post(
+        &self,
+        channel_id: Id,
+        title: String,
+        content: String,
+        tags: Vec<Id>,
+        files: Vec<std::path::PathBuf>,
+        sticker_ids: Vec<Id>,
+    ) {
+        self.spawn_rest(move |rest, link| async move {
+            let result = async {
+                let files = read_uploads(&files).await?;
+                let message = CreateMessage { content, sticker_ids, files, ..Default::default() };
+                let post = CreateForumPost { name: title, message, applied_tags: tags };
+                rest.create_forum_post(channel_id, &post).await.map_err(|e| e.to_string())
+            }
+            .await;
+            match result {
+                Ok(post) => {
+                    let id = post.channel.id;
+                    {
+                        let mut store = link.store.lock();
+                        store.upsert_channel(post.channel);
+                        if let Some(m) = post.message {
+                            store.apply(&Dispatch::MessageCreate(Box::new(m)));
+                        }
+                    }
+                    link.emit(UiEvent::ForumPostResult { channel_id, result: Ok(id) });
+                    link.emit(UiEvent::OpenChannel(id));
+                }
+                Err(e) => {
+                    link.emit(UiEvent::ForumPostResult { channel_id, result: Err(e.clone()) });
+                    link.toast(format!("Couldn't create the post: {e}"), true);
+                }
+            }
+        });
+    }
+
     fn send_pending(&mut self, nonce: String) {
         let Some(p) = self.pending_sends.get(&nonce) else { return };
         let (channel, content, reply_to, mention_reply, files, sticker_ids) =
@@ -417,26 +462,13 @@ impl Backend {
         let internal = self.internal.clone();
         let n = nonce.clone();
         self.spawn_rest(move |rest, link| async move {
-            let mut uploads = vec![];
-            let mut total = 0u64;
-            for path in &files {
-                match tokio::fs::read(path).await {
-                    Ok(bytes) => {
-                        total += bytes.len() as u64;
-                        let filename = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
-                        uploads.push(FileUpload { filename, bytes, content_type: None, spoiler: false });
-                    }
-                    Err(e) => {
-                        let _ =
-                            internal.send(Internal::SendFailed { channel, nonce: n, error: format!("can't read {}: {e}", path.display()) });
-                        return;
-                    }
+            let uploads = match read_uploads(&files).await {
+                Ok(u) => u,
+                Err(error) => {
+                    let _ = internal.send(Internal::SendFailed { channel, nonce: n, error });
+                    return;
                 }
-            }
-            if total > MAX_UPLOAD_BYTES {
-                let _ = internal.send(Internal::SendFailed { channel, nonce: n, error: "files exceed the 10 MB bot upload limit".into() });
-                return;
-            }
+            };
             let msg = CreateMessage {
                 content,
                 nonce: Some(n.clone()),
@@ -579,6 +611,22 @@ impl Backend {
         self.store().limits.inactive_channel_messages = s.advanced.memory_messages_per_channel as usize;
         self.apply_autostart(s.behavior.start_on_boot);
     }
+}
+
+/// Reads attachments from disk, enforcing the bot upload limit.
+async fn read_uploads(files: &[std::path::PathBuf]) -> Result<Vec<FileUpload>, String> {
+    let mut uploads = Vec::with_capacity(files.len());
+    let mut total = 0u64;
+    for path in files {
+        let bytes = tokio::fs::read(path).await.map_err(|e| format!("can't read {}: {e}", path.display()))?;
+        total += bytes.len() as u64;
+        if total > MAX_UPLOAD_BYTES {
+            return Err("files exceed the 10 MB bot upload limit".into());
+        }
+        let filename = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
+        uploads.push(FileUpload { filename, bytes, content_type: None, spoiler: false });
+    }
+    Ok(uploads)
 }
 
 /// Remove cached messages inside the fetched page's id range that Discord no longer returns

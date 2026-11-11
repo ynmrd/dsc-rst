@@ -371,3 +371,81 @@ async fn edits_to_messages_outside_open_channels_reach_the_cache() {
     let hits = db.search(&dn_storage::SearchFilter { query: "before".into(), ..Default::default() }).unwrap();
     assert!(hits.is_empty(), "search index still has the pre-edit text");
 }
+
+fn next_forum_result(ui: &UiLink) -> (Id, Result<Id, String>) {
+    loop {
+        if let UiEvent::ForumPostResult { channel_id, result } = next_event(ui, "forum post result") {
+            return (channel_id, result);
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn forum_posts_are_created_and_errors_reported() {
+    const FORUM: u64 = 30;
+    let rest = mock_rest(true).await;
+    let mut post = json!({"id": "31", "type": 11, "guild_id": GUILD, "parent_id": FORUM.to_string(), "name": "First post",
+                          "applied_tags": ["5"], "thread_metadata": {"archived": false}, "message_count": 1});
+    post["message"] = json!({"id": "31", "channel_id": "31", "guild_id": GUILD, "author": {"id": BOT, "username": "testbot"},
+                             "content": "hello forum", "timestamp": "2026-01-01T00:00:00+00:00", "type": 0});
+    Mock::given(method("POST"))
+        .and(path(format!("/channels/{FORUM}/threads")))
+        .and(wiremock::matchers::body_partial_json(json!({"name": "First post", "applied_tags": ["5"]})))
+        .respond_with(ResponseTemplate::new(201).set_body_json(post))
+        .mount(&rest)
+        .await;
+    Mock::given(method("POST"))
+        .and(path(format!("/channels/{FORUM}/threads")))
+        .and(wiremock::matchers::body_partial_json(json!({"name": "Untagged"})))
+        .respond_with(
+            ResponseTemplate::new(400)
+                .set_body_json(json!({"code": 40067, "message": "A tag is required to create a forum post in this channel"})),
+        )
+        .mount(&rest)
+        .await;
+    let gw = mock_gateway(GatewayMode::Normal).await;
+    let h = start_backend(&rest.uri(), &gw.url, false).await;
+    add_bot_and_wait_ready(&h).await;
+    gw.dispatch
+        .send((
+            "CHANNEL_CREATE".into(),
+            json!({"id": FORUM.to_string(), "type": 15, "guild_id": GUILD, "name": "help", "flags": 16,
+                   "available_tags": [{"id": "5", "name": "question"}]}),
+        ))
+        .unwrap();
+    wait_for(&h.store, "forum channel", |s| s.channels.get(&Id(FORUM)).is_some_and(|c| c.requires_tag())).await;
+
+    let create = |title: &str, tags: Vec<Id>, files: Vec<std::path::PathBuf>| Command::CreateForumPost {
+        channel_id: Id(FORUM),
+        title: title.into(),
+        content: "hello forum".into(),
+        tags,
+        files,
+        sticker_ids: vec![],
+    };
+    h.ui.send(create("First post", vec![Id(5)], vec![]));
+    assert_eq!(next_forum_result(&h.ui), (Id(FORUM), Ok(Id(31))));
+    {
+        let s = h.store.lock();
+        let threads: Vec<Id> = s.threads_of(Id(FORUM)).iter().map(|t| t.id).collect();
+        assert_eq!(threads, vec![Id(31)]);
+        assert_eq!(s.channels[&Id(31)].applied_tags, vec![Id(5)]);
+        // The opening message is applied (message bodies are only kept for open channels;
+        // the UI opens the post next, which loads its history).
+        assert_eq!(s.channels[&Id(31)].last_message_id, Some(Id(31)));
+    }
+
+    h.ui.send(create("Untagged", vec![], vec![]));
+    let (channel, result) = next_forum_result(&h.ui);
+    assert_eq!(channel, Id(FORUM));
+    let err = result.unwrap_err();
+    assert!(err.contains("tag is required"), "{err}");
+
+    // Missing attachments fail locally, before any request.
+    h.ui.send(create("With file", vec![Id(5)], vec![h.paths.data_dir.join("missing.png")]));
+    let (_, result) = next_forum_result(&h.ui);
+    assert!(result.unwrap_err().contains("can't read"));
+
+    h.ui.send(Command::Shutdown);
+    tokio::time::timeout(Duration::from_secs(10), h.backend).await.unwrap().unwrap();
+}

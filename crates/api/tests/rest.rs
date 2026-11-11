@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use dn_api::{ApiError, Auth, CreateMessage, FileUpload, MessagePage, RestClient, SearchOutcome, SearchQuery};
+use dn_api::{ApiError, Auth, CreateForumPost, CreateMessage, FileUpload, MessagePage, RestClient, SearchOutcome, SearchQuery};
 use dn_core::{Emoji, Id};
 use serde_json::{Value, json};
 use wiremock::matchers::{body_json, header, method, path, query_param};
@@ -193,6 +193,87 @@ async fn multipart_upload() {
     let payload: Value = serde_json::from_str(&body[json_start..json_end]).unwrap();
     assert_eq!(payload["content"], "pic");
     assert_eq!(payload["attachments"], json!([{"id": 0, "filename": "cat.png"}, {"id": 1, "filename": "SPOILER_secret.txt"}]));
+}
+
+#[tokio::test]
+async fn forum_post_json_body_and_nested_message() {
+    let (server, client) = setup().await;
+    let mut created = json!({"id": "70", "type": 11, "guild_id": "1", "parent_id": "15", "name": "Bug: crash", "applied_tags": ["3"]});
+    created["message"] = message_json(70, 70, "steps to reproduce");
+    Mock::given(method("POST"))
+        .and(path("/channels/15/threads"))
+        .and(header("content-type", "application/json"))
+        .and(body_json(json!({
+            "name": "Bug: crash",
+            "applied_tags": ["3"],
+            "message": {
+                "content": "steps to reproduce",
+                "allowed_mentions": {"parse": ["users", "roles", "everyone"], "replied_user": false},
+                "sticker_ids": ["9"]
+            }
+        })))
+        .respond_with(ResponseTemplate::new(201).set_body_json(created))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let post = CreateForumPost {
+        name: "  Bug: crash ".into(),
+        message: CreateMessage { content: "steps to reproduce".into(), sticker_ids: vec![Id(9)], ..Default::default() },
+        applied_tags: vec![Id(3)],
+    };
+    let out = client.create_forum_post(Id(15), &post).await.unwrap();
+    assert_eq!(out.channel.id, Id(70));
+    assert_eq!(out.channel.parent_id, Some(Id(15)));
+    assert_eq!(out.channel.applied_tags, vec![Id(3)]);
+    assert_eq!(out.message.unwrap().content, "steps to reproduce");
+}
+
+#[tokio::test]
+async fn forum_post_multipart_puts_attachments_in_message() {
+    let (server, client) = setup().await;
+    Mock::given(method("POST"))
+        .and(path("/channels/15/threads"))
+        .respond_with(ResponseTemplate::new(201).set_body_json(json!({"id": "71", "type": 11, "parent_id": "15", "name": "Screenshot"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let post = CreateForumPost {
+        name: "Screenshot".into(),
+        message: CreateMessage {
+            files: vec![FileUpload { filename: "shot.png".into(), bytes: b"PNGDATA".to_vec(), content_type: None, spoiler: false }],
+            ..Default::default()
+        },
+        applied_tags: vec![],
+    };
+    let out = client.create_forum_post(Id(15), &post).await.unwrap();
+    assert!(out.message.is_none());
+    let reqs = server.received_requests().await.unwrap();
+    let body = String::from_utf8_lossy(&reqs[0].body).to_string();
+    assert!(body.contains("name=\"files[0]\"; filename=\"shot.png\""), "{body}");
+    let start = body.find("name=\"payload_json\"").unwrap();
+    let json_start = start + body[start..].find("\r\n\r\n").unwrap() + 4;
+    let json_end = json_start + body[json_start..].find("\r\n--").unwrap();
+    let payload: Value = serde_json::from_str(&body[json_start..json_end]).unwrap();
+    assert_eq!(payload["name"], "Screenshot");
+    assert!(payload.get("applied_tags").is_none());
+    assert!(payload.get("attachments").is_none());
+    assert_eq!(payload["message"]["attachments"], json!([{"id": 0, "filename": "shot.png"}]));
+}
+
+#[tokio::test]
+async fn forum_post_validation_happens_before_any_request() {
+    let (server, client) = setup().await;
+    let msg = CreateMessage { content: "x".into(), ..Default::default() };
+    let bad = [
+        CreateForumPost { name: "   ".into(), message: msg.clone(), applied_tags: vec![] },
+        CreateForumPost { name: "t".repeat(101), message: msg.clone(), applied_tags: vec![] },
+        CreateForumPost { name: "ok".into(), message: CreateMessage::default(), applied_tags: vec![] },
+        CreateForumPost { name: "ok".into(), message: msg.clone(), applied_tags: (1..=6).map(Id).collect() },
+    ];
+    for post in &bad {
+        assert!(matches!(client.create_forum_post(Id(15), post).await, Err(ApiError::Invalid(_))), "{post:?}");
+    }
+    assert!(server.received_requests().await.unwrap().is_empty());
 }
 
 #[tokio::test]

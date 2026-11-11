@@ -8,7 +8,7 @@ use egui::{Color32, CornerRadius, Key, KeyboardShortcut, Modifiers, Rect, RichTe
 
 use dn_cache::Store;
 use dn_cache::bus::{Command, SearchRequest, SearchSource};
-use dn_core::{ChannelKind, Emoji, Id, Message, Permissions};
+use dn_core::{Channel, ChannelKind, Emoji, ForumTag, Id, Message, Permissions, Sticker};
 use dn_messaging::compose::{self, CompletionKind};
 
 use crate::message::{self, RowCtx};
@@ -37,6 +37,101 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store) {
     typing_line(ui, store, channel, &p);
     composer(app, ui, store, channel, &p);
     emoji_picker(app, ui.ctx(), store, &p);
+    sticker_picker(app, ui.ctx(), store, &p);
+}
+
+/// Stickers of the channel's server that the bot can send there (Discord only accepts
+/// stickers from the same server in `sticker_ids`).
+fn sendable_stickers(store: &Store, channel: Id) -> Vec<Sticker> {
+    store
+        .guild_of(channel)
+        .and_then(|g| store.guilds.get(&g))
+        .map(|gs| gs.guild.stickers.iter().filter(|s| s.available != Some(false)).cloned().collect())
+        .unwrap_or_default()
+}
+
+fn sticker_picker(app: &mut DiscordApp, ctx: &egui::Context, store: &Store, p: &Palette) {
+    let Some(channel) = app.st.sticker_picker else { return };
+    if app.st.selected_channel != Some(channel) {
+        app.st.sticker_picker = None;
+        return;
+    }
+    let stickers = sendable_stickers(store, channel);
+    let (mut chosen, mut close) = (None, ctx.input(|i| i.key_pressed(Key::Escape)));
+    let screen = ctx.content_rect();
+    egui::Area::new(egui::Id::unique("sticker-picker"))
+        .pivot(egui::Align2::RIGHT_BOTTOM)
+        .fixed_pos(egui::pos2(screen.right() - 260.0, screen.bottom() - 76.0))
+        .order(egui::Order::Foreground)
+        .show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(p.floating)
+                .stroke(Stroke::new(1.0, p.divider))
+                .corner_radius(CornerRadius::same(8))
+                .inner_margin(10)
+                .show(ui, |ui| {
+                    ui.set_width(380.0);
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Server stickers").strong().color(p.text_strong));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.small_button("✕").clicked() {
+                                close = true;
+                            }
+                        });
+                    });
+                    if stickers.is_empty() {
+                        ui.label(RichText::new("This server has no stickers.").color(p.muted));
+                        return;
+                    }
+                    egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            for s in &stickers {
+                                let (r, resp) = ui.allocate_exact_size(vec2(84.0, 100.0), Sense::click());
+                                if resp.hovered() {
+                                    ui.painter().rect_filled(r, CornerRadius::same(6), p.hover);
+                                }
+                                let img = Rect::from_min_size(r.min + vec2(10.0, 4.0), vec2(64.0, 64.0));
+                                let item = dn_core::StickerItem { id: s.id, name: s.name.clone(), format_type: s.format_type };
+                                match item.url(160).and_then(|u| app.textures.get(&u, 160)) {
+                                    Some(tex) => egui::Image::new((tex.id(), img.size())).paint_at(ui, img),
+                                    None => {
+                                        ui.painter().rect_filled(img, CornerRadius::same(6), p.sidebar);
+                                    }
+                                }
+                                let name: String = s.name.chars().take(12).collect();
+                                ui.painter().text(
+                                    egui::pos2(r.center().x, r.bottom() - 16.0),
+                                    egui::Align2::CENTER_CENTER,
+                                    name,
+                                    egui::FontId::proportional(12.0),
+                                    p.text,
+                                );
+                                if resp.on_hover_text(&s.name).clicked() {
+                                    chosen = Some(s.id);
+                                }
+                            }
+                        });
+                    });
+                });
+        });
+    if let Some(id) = chosen {
+        let comp = app.st.composer(channel);
+        let reply_to = comp.reply_to.take();
+        let mention_reply = comp.mention_reply;
+        app.link.send(Command::SendMessage {
+            channel_id: channel,
+            content: String::new(),
+            reply_to,
+            mention_reply,
+            files: vec![],
+            sticker_ids: vec![id],
+        });
+        app.st.list(channel).scroll_to = Some(f32::MAX);
+        close = true;
+    }
+    if close {
+        app.st.sticker_picker = None;
+    }
 }
 
 fn empty_state(app: &mut DiscordApp, ui: &mut Ui, store: &Store, p: &Palette) {
@@ -707,7 +802,11 @@ fn composer(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id, p
                         Some(c) => format!("Message #{}", c.display_name()),
                         None => String::new(),
                     };
-                    let w = ui.available_width() - 40.0;
+                    let has_stickers = store
+                        .guild_of(channel)
+                        .and_then(|g| store.guilds.get(&g))
+                        .is_some_and(|gs| gs.guild.stickers.iter().any(|s| s.available != Some(false)));
+                    let w = ui.available_width() - if has_stickers { 72.0 } else { 40.0 };
                     let out = egui::TextEdit::multiline(&mut text)
                         .id(input_id)
                         .hint_text(hint)
@@ -750,7 +849,12 @@ fn composer(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id, p
                             app.link.send(Command::Typing { channel_id: channel });
                         }
                     }
+                    if has_stickers && widgets::icon_button(ui, p, "🎫", "Stickers", None).clicked() {
+                        app.st.emoji_picker = None;
+                        app.st.sticker_picker = if app.st.sticker_picker == Some(channel) { None } else { Some(channel) };
+                    }
                     if widgets::icon_button(ui, p, "☺", "Emoji", None).clicked() {
+                        app.st.sticker_picker = None;
                         app.st.emoji_picker = match app.st.emoji_picker {
                             Some(EmojiTarget::Composer) => None,
                             _ => Some(EmojiTarget::Composer),
@@ -835,25 +939,62 @@ fn send_message(app: &mut DiscordApp, store: &mut Store, channel: Id, text: &mut
     let _ = store;
 }
 
+fn tag_text(t: &ForumTag) -> String {
+    match t.emoji_name.as_deref().filter(|e| !e.is_empty()) {
+        Some(e) => format!("{e} {}", t.name),
+        None => t.name.clone(),
+    }
+}
+
 fn forum_view(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id, p: &Palette) {
-    let threads: Vec<(Id, String, Option<u32>)> =
-        store.threads_of(channel).iter().map(|t| (t.id, t.display_name(), t.message_count)).collect();
+    let Some(forum) = store.channels.get(&channel).cloned() else { return };
+    let perms = store.permissions_in(channel);
+    let can_post = perms.can_send();
+    let threads: Vec<(Id, String, Option<u32>, Vec<Id>)> =
+        store.threads_of(channel).iter().map(|t| (t.id, t.display_name(), t.message_count, t.applied_tags.clone())).collect();
     egui::ScrollArea::vertical().show(ui, |ui| {
         egui::Frame::new().inner_margin(16).show(ui, |ui| {
-            ui.label(RichText::new("Forum posts").size(20.0).strong().color(p.text_strong));
-            ui.label(
-                RichText::new("Active posts visible to the bot. Creating new forum posts isn't supported in this client yet.")
-                    .color(p.muted),
-            );
+            let form_open = app.st.forum_drafts.get(&channel).is_some_and(|d| d.open);
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Forum posts").size(20.0).strong().color(p.text_strong));
+                if can_post && !form_open {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if widgets::primary_button(ui, p, "New Post").clicked() {
+                            app.st.forum_drafts.entry(channel).or_default().open = true;
+                        }
+                    });
+                }
+            });
+            let note = if can_post {
+                "Active posts visible to the bot."
+            } else {
+                "Active posts visible to the bot. The bot doesn't have permission to create posts here."
+            };
+            ui.label(RichText::new(note).color(p.muted));
             ui.add_space(8.0);
+            if form_open {
+                forum_post_form(app, ui, &forum, perms, p);
+                ui.add_space(12.0);
+            }
             if threads.is_empty() {
                 ui.label(RichText::new("No active posts.").color(p.faint));
             }
-            for (id, name, count) in threads {
+            for (id, name, count, applied) in threads {
                 let r = egui::Frame::new().fill(p.sidebar).corner_radius(CornerRadius::same(8)).inner_margin(12).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.label(RichText::new(&name).strong().color(p.text_strong));
-                    ui.label(RichText::new(format!("{} messages", count.unwrap_or(0))).color(p.muted).size(12.0));
+                    ui.horizontal_wrapped(|ui| {
+                        for t in forum.available_tags.iter().filter(|t| applied.contains(&t.id)) {
+                            egui::Frame::new()
+                                .fill(p.hover)
+                                .corner_radius(CornerRadius::same(10))
+                                .inner_margin(egui::Margin::symmetric(8, 2))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new(tag_text(t)).size(11.5).color(p.text));
+                                });
+                        }
+                        ui.label(RichText::new(format!("{} messages", count.unwrap_or(0))).color(p.muted).size(12.0));
+                    });
                 });
                 if ui
                     .interact(r.response.rect, egui::Id::unique(("post", id)), Sense::click())
@@ -866,6 +1007,116 @@ fn forum_view(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, channel: Id,
             }
         });
     });
+}
+
+/// Inline "New post" form. Files picked here go to the forum channel's composer attachments.
+fn forum_post_form(app: &mut DiscordApp, ui: &mut Ui, forum: &Channel, perms: Permissions, p: &Palette) {
+    let channel = forum.id;
+    let can_moderate = perms.contains(Permissions::MANAGE_THREADS);
+    let can_attach = perms.contains(Permissions::ATTACH_FILES);
+    let files = app.st.composer(channel).attachments.clone();
+    let (mut submit, mut cancel, mut pick, mut remove) = (false, false, false, None);
+    let d = app.st.forum_drafts.entry(channel).or_default();
+    egui::Frame::new().fill(p.sidebar).corner_radius(CornerRadius::same(8)).inner_margin(12).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.label(RichText::new("New post").strong().color(p.text_strong));
+        ui.add_space(4.0);
+        ui.add_enabled(
+            !d.posting,
+            egui::TextEdit::singleline(&mut d.title)
+                .id_salt(("forum-title", channel))
+                .hint_text("Post title")
+                .char_limit(100)
+                .desired_width(f32::INFINITY),
+        );
+        ui.add_enabled(
+            !d.posting,
+            egui::TextEdit::multiline(&mut d.body)
+                .id_salt(("forum-body", channel))
+                .hint_text("Message (Markdown supported)")
+                .char_limit(2000)
+                .desired_rows(4)
+                .desired_width(f32::INFINITY),
+        );
+        if !forum.available_tags.is_empty() {
+            ui.horizontal_wrapped(|ui| {
+                let label = if forum.requires_tag() { "Tags (at least one required):" } else { "Tags:" };
+                ui.label(RichText::new(label).color(p.muted).size(12.0));
+                for t in &forum.available_tags {
+                    let selected = d.tags.contains(&t.id);
+                    let allowed = (!t.moderated || can_moderate) && (selected || d.tags.len() < Channel::MAX_APPLIED_TAGS);
+                    let r = ui.add_enabled(allowed && !d.posting, egui::Button::selectable(selected, tag_text(t)));
+                    let r = if t.moderated && !can_moderate { r.on_disabled_hover_text("Only moderators can apply this tag") } else { r };
+                    if r.clicked() {
+                        if selected {
+                            d.tags.retain(|x| *x != t.id);
+                        } else {
+                            d.tags.push(t.id);
+                        }
+                    }
+                }
+            });
+        }
+        if !files.is_empty() {
+            ui.horizontal_wrapped(|ui| {
+                for (i, f) in files.iter().enumerate() {
+                    let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    ui.label(format!("📎 {name}"));
+                    if ui.small_button("✕").clicked() {
+                        remove = Some(i);
+                    }
+                }
+            });
+        }
+        if let Some(e) = &d.error {
+            ui.label(RichText::new(e).color(p.red).size(12.5));
+        }
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            let ready = !d.posting
+                && !d.title.trim().is_empty()
+                && (!d.body.trim().is_empty() || !files.is_empty())
+                && (!forum.requires_tag() || !d.tags.is_empty());
+            let label = if d.posting { "Posting…" } else { "Post" };
+            submit = ui.add_enabled_ui(ready, |ui| widgets::primary_button(ui, p, label)).inner.clicked();
+            if ui.add_enabled(!d.posting, egui::Button::new("Cancel")).clicked() {
+                cancel = true;
+            }
+            if can_attach && ui.add_enabled(!d.posting, egui::Button::new("📎 Attach files")).clicked() {
+                pick = true;
+            }
+            if d.posting {
+                ui.spinner();
+            }
+        });
+    });
+    if submit {
+        d.posting = true;
+        d.error = None;
+        let cmd = Command::CreateForumPost {
+            channel_id: channel,
+            title: d.title.trim().to_string(),
+            content: dn_messaging::emoji::replace_shortcodes(d.body.trim_end()),
+            tags: d.tags.clone(),
+            files: files.clone(),
+            sticker_ids: vec![],
+        };
+        app.link.send(cmd);
+    } else if cancel {
+        app.st.forum_drafts.remove(&channel);
+        app.st.composer(channel).attachments.clear();
+    }
+    if let Some(i) = remove {
+        app.st.composer(channel).attachments.remove(i);
+    }
+    if pick {
+        let (tx, rx) = crossbeam_channel::bounded(1);
+        std::thread::spawn(move || {
+            let files = rfd::FileDialog::new().pick_files().unwrap_or_default();
+            let _ = tx.send((channel, files));
+        });
+        app.st.file_dialog_rx = Some(rx);
+    }
 }
 
 pub fn search_panel(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store) {

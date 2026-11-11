@@ -39,6 +39,8 @@ pub enum Command {
     Search(SearchRequest),
     OpenDm { user_id: Id },
     CreateThread { channel_id: Id, message_id: Id, name: String },
+    // Forum/media post; answered with UiEvent::ForumPostResult.
+    CreateForumPost { channel_id: Id, title: String, content: String, tags: Vec<Id>, files: Vec<PathBuf>, sticker_ids: Vec<Id> },
     DownloadTo { url: String, path: PathBuf },
     FetchProfile { user_id: Id, guild_id: Option<Id> },
     RequestMembers { guild_id: Id },
@@ -82,6 +84,8 @@ pub enum UiEvent {
     Pins { channel_id: Id, messages: Vec<Message> },
     Profile { user: Box<User>, member: Option<Box<Member>>, guild_id: Option<Id> },
     OpenChannel(Id),
+    // Result of Command::CreateForumPost: the new post id or an error message.
+    ForumPostResult { channel_id: Id, result: Result<Id, String> },
     OAuthFinished(Result<String, String>),
     AccountAdded(Result<String, String>),
     RequestAttention,

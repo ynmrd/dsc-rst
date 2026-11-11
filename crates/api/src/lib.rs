@@ -337,22 +337,8 @@ impl RestClient {
 
     /// Sends JSON, or multipart (`payload_json` + `files[n]`) when files are attached.
     pub async fn create_message(&self, channel: Id, msg: &CreateMessage) -> Result<Message, ApiError> {
-        if msg.content.trim().is_empty() && msg.files.is_empty() && msg.sticker_ids.is_empty() {
-            return Err(ApiError::Invalid("the message is empty".into()));
-        }
-        if msg.files.len() > MAX_FILES {
-            return Err(ApiError::Invalid(format!("at most {MAX_FILES} files can be attached to one message")));
-        }
-        if msg.sticker_ids.len() > 3 {
-            return Err(ApiError::Invalid("at most 3 stickers can be sent in one message".into()));
-        }
-        let mut payload = serde_json::Map::new();
-        payload.insert("content".into(), json!(msg.content));
+        let mut payload = message_fields(msg)?;
         payload.insert("tts".into(), json!(msg.tts));
-        payload.insert(
-            "allowed_mentions".into(),
-            json!({ "parse": ["users", "roles", "everyone"], "replied_user": msg.mention_replied_user }),
-        );
         if let Some(nonce) = msg.nonce.as_deref().filter(|n| !n.is_empty()) {
             if nonce.len() > 25 {
                 return Err(ApiError::Invalid("message nonce must be at most 25 characters".into()));
@@ -363,33 +349,43 @@ impl RestClient {
         if let Some(reply) = msg.reply_to {
             payload.insert("message_reference".into(), json!({ "message_id": reply, "fail_if_not_exists": false }));
         }
-        if !msg.sticker_ids.is_empty() {
-            payload.insert("sticker_ids".into(), json!(msg.sticker_ids));
-        }
         let path = format!("/channels/{channel}/messages");
         let req = if msg.files.is_empty() {
             Request::new(Method::POST, path).json(&payload)?
         } else {
-            let files: Vec<PreparedFile> = msg
-                .files
-                .iter()
-                .map(|f| {
-                    let name = f.upload_name();
-                    let mime = f
-                        .content_type
-                        .clone()
-                        .filter(|c| c.contains('/') && HeaderValue::from_str(c).is_ok())
-                        .unwrap_or_else(|| guess_mime(&name).to_string());
-                    PreparedFile { name, mime, bytes: Bytes::copy_from_slice(&f.bytes) }
-                })
-                .collect();
-            let attachments: Vec<_> = files.iter().enumerate().map(|(i, f)| json!({ "id": i, "filename": f.name })).collect();
+            let (files, attachments) = prepare_files(&msg.files);
             payload.insert("attachments".into(), json!(attachments));
-            let payload = serde_json::to_string(&payload).map_err(|e| ApiError::Invalid(e.to_string()))?;
-            let mut req = Request::new(Method::POST, path);
-            req.body = Body::Multipart { payload, files };
-            req.timeout = UPLOAD_TIMEOUT;
-            req
+            multipart_request(path, &payload, files)?
+        };
+        self.json(req).await
+    }
+
+    /// Starts a post in a forum or media channel (`POST /channels/{id}/threads`). Only
+    /// content, stickers and files of `post.message` are used; replies, nonces and TTS
+    /// don't apply to the opening message of a post.
+    pub async fn create_forum_post(&self, channel: Id, post: &CreateForumPost) -> Result<ForumPost, ApiError> {
+        let name = post.name.trim();
+        if name.is_empty() || name.chars().count() > 100 {
+            return Err(ApiError::Invalid("post titles must be 1-100 characters".into()));
+        }
+        if post.applied_tags.len() > Channel::MAX_APPLIED_TAGS {
+            return Err(ApiError::Invalid(format!("at most {} tags can be applied to a post", Channel::MAX_APPLIED_TAGS)));
+        }
+        let mut message = message_fields(&post.message)?;
+        let mut payload = serde_json::Map::new();
+        payload.insert("name".into(), json!(name));
+        if !post.applied_tags.is_empty() {
+            payload.insert("applied_tags".into(), json!(post.applied_tags));
+        }
+        let path = format!("/channels/{channel}/threads");
+        let req = if post.message.files.is_empty() {
+            payload.insert("message".into(), json!(message));
+            Request::new(Method::POST, path).json(&payload)?
+        } else {
+            let (files, attachments) = prepare_files(&post.message.files);
+            message.insert("attachments".into(), json!(attachments));
+            payload.insert("message".into(), json!(message));
+            multipart_request(path, &payload, files)?
         };
         self.json(req).await
     }
@@ -603,6 +599,52 @@ fn build_form(payload: &str, files: &[PreparedFile]) -> Result<Form, ApiError> {
         form = form.part(format!("files[{i}]"), part);
     }
     Ok(form)
+}
+
+/// Validates `msg` and returns the fields shared by normal messages and forum posts.
+fn message_fields(msg: &CreateMessage) -> Result<serde_json::Map<String, serde_json::Value>, ApiError> {
+    if msg.content.trim().is_empty() && msg.files.is_empty() && msg.sticker_ids.is_empty() {
+        return Err(ApiError::Invalid("the message is empty".into()));
+    }
+    if msg.files.len() > MAX_FILES {
+        return Err(ApiError::Invalid(format!("at most {MAX_FILES} files can be attached to one message")));
+    }
+    if msg.sticker_ids.len() > 3 {
+        return Err(ApiError::Invalid("at most 3 stickers can be sent in one message".into()));
+    }
+    let mut payload = serde_json::Map::new();
+    payload.insert("content".into(), json!(msg.content));
+    payload.insert("allowed_mentions".into(), json!({ "parse": ["users", "roles", "everyone"], "replied_user": msg.mention_replied_user }));
+    if !msg.sticker_ids.is_empty() {
+        payload.insert("sticker_ids".into(), json!(msg.sticker_ids));
+    }
+    Ok(payload)
+}
+
+/// Upload parts plus the matching `attachments` metadata (`id` = index of `files[n]`).
+fn prepare_files(files: &[FileUpload]) -> (Vec<PreparedFile>, Vec<serde_json::Value>) {
+    let files: Vec<PreparedFile> = files
+        .iter()
+        .map(|f| {
+            let name = f.upload_name();
+            let mime = f
+                .content_type
+                .clone()
+                .filter(|c| c.contains('/') && HeaderValue::from_str(c).is_ok())
+                .unwrap_or_else(|| guess_mime(&name).to_string());
+            PreparedFile { name, mime, bytes: Bytes::copy_from_slice(&f.bytes) }
+        })
+        .collect();
+    let attachments = files.iter().enumerate().map(|(i, f)| json!({ "id": i, "filename": f.name })).collect();
+    (files, attachments)
+}
+
+fn multipart_request(path: String, payload: &impl Serialize, files: Vec<PreparedFile>) -> Result<Request, ApiError> {
+    let payload = serde_json::to_string(payload).map_err(|e| ApiError::Invalid(e.to_string()))?;
+    let mut req = Request::new(Method::POST, path);
+    req.body = Body::Multipart { payload, files };
+    req.timeout = UPLOAD_TIMEOUT;
+    Ok(req)
 }
 
 fn guess_mime(name: &str) -> &'static str {

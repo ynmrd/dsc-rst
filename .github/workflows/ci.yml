@@ -50,11 +50,22 @@ jobs:
       - name: Installer
         shell: pwsh
         run: |
+          # windows-2025 (windows-latest) no longer ships NSIS; install it when missing.
+          $candidates = @("${env:ProgramFiles(x86)}\NSIS\makensis.exe", "$env:ProgramFiles\NSIS\makensis.exe")
+          $makensis = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $makensis) {
+            choco install nsis --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $makensis = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $makensis) { Write-Error "makensis.exe not found after installing NSIS"; exit 1 }
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches.Groups[1].Value
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item target\release\discord-native.exe "dist\discord-native-$version-windows-x64.exe"
-          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" /V2 "/DVERSION=$version" "/DEXE=..\target\release\discord-native.exe" "/DOUTFILE=..\dist\DiscordNative-Setup-$version.exe" installer\discord-native.nsi
+          & $makensis /V2 "/DVERSION=$version" "/DEXE=..\target\release\discord-native.exe" "/DOUTFILE=..\dist\DiscordNative-Setup-$version.exe" installer\discord-native.nsi
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $sums = Get-ChildItem dist -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name }
+          $sums | Set-Content dist\SHA256SUMS.txt
           Get-ChildItem dist
       - uses: actions/upload-artifact@v4
         with:
