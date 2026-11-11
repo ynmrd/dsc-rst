@@ -140,6 +140,17 @@ impl DiscordApp {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
                     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
                 }
+                UiEvent::ForumPostResult { channel_id, result } => match result {
+                    Ok(_) => {
+                        self.st.forum_drafts.remove(&channel_id);
+                        self.st.composer(channel_id).attachments.clear();
+                    }
+                    Err(e) => {
+                        let d = self.st.forum_drafts.entry(channel_id).or_default();
+                        d.posting = false;
+                        d.error = Some(e);
+                    }
+                },
                 UiEvent::OAuthFinished(r) => {
                     self.st.onboarding.oauth_busy = false;
                     match r {

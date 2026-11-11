@@ -250,9 +250,34 @@ pub struct Channel {
     pub member_count: Option<u32>,
     pub thread_metadata: Option<ThreadMetadata>,
     pub flags: u64,
+    /// Tags offered by a forum/media channel.
+    pub available_tags: Vec<ForumTag>,
+    /// Tags applied to a forum/media post (thread).
+    pub applied_tags: Vec<Id>,
+}
+
+/// Tag of a forum or media channel.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ForumTag {
+    pub id: Id,
+    pub name: String,
+    /// Only members with MANAGE_THREADS may apply it.
+    pub moderated: bool,
+    pub emoji_id: Option<Id>,
+    pub emoji_name: Option<String>,
 }
 
 impl Channel {
+    /// Channel flag: new forum/media posts must carry at least one tag.
+    pub const FLAG_REQUIRE_TAG: u64 = 1 << 4;
+    /// Maximum tags per forum post.
+    pub const MAX_APPLIED_TAGS: usize = 5;
+
+    pub fn requires_tag(&self) -> bool {
+        self.flags & Self::FLAG_REQUIRE_TAG != 0
+    }
+
     /// Human readable name; DMs fall back to recipient names.
     pub fn display_name(&self) -> String {
         if let Some(n) = self.name.as_deref().filter(|n| !n.is_empty()) {
@@ -960,6 +985,22 @@ mod tests {
         }
         let c: Channel = serde_json::from_str(r#"{"id":"1","type":15}"#).unwrap();
         assert!(c.kind.is_forum());
+        assert!(!c.requires_tag());
+    }
+
+    #[test]
+    fn forum_tags_parse() {
+        let json = r#"{"id":"1","type":15,"flags":16,"available_tags":[
+            {"id":"10","name":"bug","moderated":false,"emoji_id":null,"emoji_name":"🐛"},
+            {"id":"11","name":"staff","moderated":true,"emoji_id":"99","emoji_name":null}]}"#;
+        let c: Channel = serde_json::from_str(json).unwrap();
+        assert!(c.requires_tag());
+        assert_eq!(c.available_tags.len(), 2);
+        assert_eq!(c.available_tags[0].emoji_name.as_deref(), Some("🐛"));
+        assert!(c.available_tags[1].moderated);
+        assert_eq!(c.available_tags[1].emoji_id, Some(Id(99)));
+        let post: Channel = serde_json::from_str(r#"{"id":"2","type":11,"parent_id":"1","applied_tags":["10"]}"#).unwrap();
+        assert_eq!(post.applied_tags, vec![Id(10)]);
     }
 
     #[test]

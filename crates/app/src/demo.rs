@@ -7,12 +7,13 @@ use serde_json::json;
 
 use dn_cache::bus::{BackendLink, Command, SearchSource, UiEvent};
 use dn_cache::{ConnStatus, SharedStore};
-use dn_core::{Dispatch, Id, Message, MessageDelete, MessageUpdate, ReactionEvent, User};
+use dn_core::{Channel, ChannelKind, Dispatch, Id, Message, MessageDelete, MessageUpdate, ReactionEvent, StickerItem, User};
 
 const ME: u64 = 900_000_000_000_000_001;
 const GUILD_A: u64 = 800_000_000_000_000_001;
 const GUILD_B: u64 = 800_000_000_000_000_002;
 const GENERAL: u64 = 810_000_000_000_000_001;
+const FORUM: u64 = 810_000_000_000_000_008;
 const DM: u64 = 820_000_000_000_000_001;
 
 const PEOPLE: [(u64, &str, &str); 6] = [
@@ -94,18 +95,31 @@ pub fn populate(store: &SharedStore) {
                 { "id": GENERAL.to_string(), "type": 0, "name": "general", "position": 0, "parent_id": "810000000000000100", "topic": "Chat about anything", "last_message_id": "0" },
                 { "id": "810000000000000002", "type": 0, "name": "showcase", "position": 1, "parent_id": "810000000000000100" },
                 { "id": "810000000000000003", "type": 5, "name": "announcements", "position": 2, "parent_id": "810000000000000100" },
+                { "id": FORUM.to_string(), "type": 15, "name": "help-forum", "position": 3, "parent_id": "810000000000000100", "topic": "Ask questions, one post per topic",
+                  "available_tags": [
+                      { "id": "840000000000000001", "name": "question", "emoji_name": "❓" },
+                      { "id": "840000000000000002", "name": "bug", "emoji_name": "🐛" },
+                      { "id": "840000000000000003", "name": "solved", "moderated": true }
+                  ] },
                 { "id": "810000000000000200", "type": 4, "name": "Voice Channels", "position": 1 },
                 { "id": "810000000000000004", "type": 2, "name": "Lounge", "position": 0, "parent_id": "810000000000000200" },
                 { "id": "810000000000000005", "type": 2, "name": "Pair programming", "position": 1, "parent_id": "810000000000000200" }
             ],
-            "threads": [{ "id": "810000000000000006", "type": 11, "name": "release-planning", "parent_id": GENERAL.to_string(), "thread_metadata": { "archived": false }, "message_count": 12 }],
+            "threads": [
+                { "id": "810000000000000006", "type": 11, "name": "release-planning", "parent_id": GENERAL.to_string(), "thread_metadata": { "archived": false }, "message_count": 12 },
+                { "id": "810000000000000007", "type": 11, "name": "How do I enable push-to-talk?", "parent_id": FORUM.to_string(), "thread_metadata": { "archived": false }, "message_count": 3, "applied_tags": ["840000000000000001"] }
+            ],
             "members": members,
             "presences": presences,
             "voice_states": [
                 { "user_id": PEOPLE[1].0.to_string(), "channel_id": "810000000000000004", "session_id": "x" },
                 { "user_id": PEOPLE[3].0.to_string(), "channel_id": "810000000000000004", "session_id": "y", "self_mute": true }
             ],
-            "emojis": []
+            "emojis": [],
+            "stickers": [
+                { "id": "850000000000000001", "name": "Ferris wave", "tags": "wave", "format_type": 1, "available": true, "guild_id": GUILD_A.to_string() },
+                { "id": "850000000000000002", "name": "Ship it", "tags": "rocket", "format_type": 1, "available": true, "guild_id": GUILD_A.to_string() }
+            ]
         }),
     ));
     s.apply(&d(
@@ -201,11 +215,23 @@ pub async fn serve(link: BackendLink, mut commands: tokio::sync::mpsc::Unbounded
             User { id: Id(ME), username: "native-bot".into(), global_name: Some("Native Bot".into()), bot: true, ..Default::default() };
         match cmd {
             Command::Shutdown => break,
-            Command::SendMessage { channel_id, content, reply_to, .. } => {
+            Command::SendMessage { channel_id, content, reply_to, sticker_ids, .. } => {
                 let now = Utc::now().timestamp_millis();
                 let mut store = link.store.lock();
                 let referenced = reply_to.and_then(|r| store.channel_messages(channel_id).and_then(|cm| cm.get(r).cloned()));
                 let nonce = store.channel_messages(channel_id).and_then(|cm| cm.pending.last().map(|p| p.nonce.clone()));
+                let sticker_items = store
+                    .guild_of(channel_id)
+                    .and_then(|g| store.guilds.get(&g))
+                    .map(|gs| {
+                        gs.guild
+                            .stickers
+                            .iter()
+                            .filter(|s| sticker_ids.contains(&s.id))
+                            .map(|s| StickerItem { id: s.id, name: s.name.clone(), format_type: s.format_type })
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 let m = Message {
                     id: Id(Id::from_timestamp_ms(now as u64).0 + 1),
                     channel_id,
@@ -216,9 +242,43 @@ pub async fn serve(link: BackendLink, mut commands: tokio::sync::mpsc::Unbounded
                     kind: if referenced.is_some() { 19 } else { 0 },
                     referenced_message: referenced.map(Box::new),
                     nonce: nonce.map(serde_json::Value::String),
+                    sticker_items,
                     ..Default::default()
                 };
                 store.apply(&Dispatch::MessageCreate(Box::new(m)));
+            }
+            Command::CreateForumPost { channel_id, title, content, tags, .. } => {
+                let now = Utc::now().timestamp_millis();
+                let post_id = Id(Id::from_timestamp_ms(now as u64).0 + 2);
+                {
+                    let mut store = link.store.lock();
+                    let guild_id = store.guild_of(channel_id);
+                    store.upsert_channel(Channel {
+                        id: post_id,
+                        kind: ChannelKind::PublicThread,
+                        guild_id,
+                        parent_id: Some(channel_id),
+                        name: Some(title),
+                        owner_id: Some(Id(ME)),
+                        message_count: Some(1),
+                        last_message_id: Some(post_id),
+                        applied_tags: tags,
+                        thread_metadata: Some(Default::default()),
+                        ..Default::default()
+                    });
+                    let m = Message {
+                        id: post_id,
+                        channel_id: post_id,
+                        guild_id,
+                        author: me,
+                        content,
+                        timestamp: ts(now),
+                        ..Default::default()
+                    };
+                    store.messages_loaded(post_id, vec![m], None, true);
+                }
+                link.emit(UiEvent::ForumPostResult { channel_id, result: Ok(post_id) });
+                link.emit(UiEvent::OpenChannel(post_id));
             }
             Command::EditMessage { channel_id, message_id, content } => {
                 let u = MessageUpdate {

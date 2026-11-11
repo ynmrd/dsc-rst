@@ -70,6 +70,18 @@ pub struct Composer {
     pub completion_selected: usize,
 }
 
+/// "New post" form of a forum/media channel. Attachments live in that channel's `Composer`.
+#[derive(Debug, Default)]
+pub struct ForumDraft {
+    pub open: bool,
+    pub title: String,
+    pub body: String,
+    pub tags: Vec<Id>,
+    /// Waiting for `UiEvent::ForumPostResult`.
+    pub posting: bool,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Default)]
 pub struct OnboardingState {
     pub token: String,
@@ -113,6 +125,9 @@ pub struct UiState {
     pub revealed_spoilers: HashSet<(u64, usize)>,
     pub emoji_picker: Option<EmojiTarget>,
     pub emoji_query: String,
+    /// Channel whose sticker picker is open.
+    pub sticker_picker: Option<Id>,
+    pub forum_drafts: HashMap<Id, ForumDraft>,
     pub lists: HashMap<Id, ListState>,
     pub typing_sent: Option<(Id, Instant)>,
     pub ptt_down: bool,

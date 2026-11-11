@@ -12,8 +12,8 @@ A native desktop client for Discord, written in Rust with an egui/wgpu UI instea
 
 ## Features
 
-- Servers, categories, text/announcement/voice/forum channels and threads, with permission-aware visibility.
-- Real-time messaging over gateway v10, with history paging, edits, deletes, replies, mentions, reactions, custom emoji, pins, typing indicators and file uploads/downloads.
+- Servers, categories, text/announcement/voice/forum channels and threads, with permission-aware visibility. New forum posts can be created with a title, tags and attachments.
+- Real-time messaging over gateway v10, with history paging, edits, deletes, replies, mentions, reactions, custom emoji, server stickers (sticker picker), pins, typing indicators and file uploads/downloads.
 - Discord-flavoured Markdown (bold/italic/underline/strike, spoilers, code blocks, quotes, headings, lists, masked links, timestamps, mentions), embeds, stickers, polls (view only) and image previews.
 - Search through Discord's guild search API (needs the Message Content intent), with a local full-text index as fallback.
 - Unread markers and mention badges. Bots have no server-side read state, so it is stored locally.
@@ -32,7 +32,7 @@ A native desktop client for Discord, written in Rust with an egui/wgpu UI instea
 
 Pick one of these:
 
-- **Installer:** download `DiscordNative-Setup-<version>.exe` from the latest CI run's artifacts (Actions → CI → *discord-native-windows-x64*). It is a per-user install and needs no admin rights.
+- **Installer:** download `DiscordNative-Setup-<version>.exe` from the latest CI run's artifacts (Actions → CI → *discord-native-windows-x64*). It is a per-user install and needs no admin rights. The artifact also contains `SHA256SUMS.txt`.
 - **Portable:** use `discord-native-<version>-windows-x64.exe` from the same artifact. Set `DN_HOME=<folder>` to keep all data next to it.
 - **From source:** see [Building](#building).
 
@@ -67,7 +67,7 @@ This shows your real profile and lists your servers so you can invite the bot mo
 ## Command line
 
 ```
-discord-native [--minimized] [--demo] [--self-check [--network]] [--software-render] [--version]
+discord-native [--minimized] [--demo [--bench-stress N]] [--self-check [--network]] [--software-render] [--version]
 ```
 
 - `--demo` shows offline sample data with a visible banner. It never connects to Discord and is useful for previewing the UI.
@@ -85,16 +85,18 @@ discord-native [--minimized] [--demo] [--self-check [--network]] [--software-ren
 
 ## Building
 
-Requires Rust stable (1.88+). On Windows install the MSVC toolchain; on Linux install the packages listed in [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Requires Rust stable (1.88+). On Windows install the MSVC toolchain; on Linux install the packages listed in [.github/workflows/ci.yml](.github/workflows/ci.yml) (running the app also needs `libxkbcommon-x11-0`).
 
 ```bash
 cargo run -p discord-native --release          # run
+cargo run -p discord-native -- --demo          # offline UI preview with sample data
 cargo test --workspace                         # tests
 cargo build --release -p discord-native        # native release build (fat LTO)
 scripts/package-windows.sh                     # Linux -> Windows cross build + NSIS installer (needs mingw-w64, nsis)
+PROFILE=release-fast scripts/package-windows.sh  # same, with thin LTO (much faster to build)
 ```
 
-Benchmarks live in the crates: `cargo bench -p dn-storage`, `cargo bench -p dn-messaging` and `cargo bench -p dn-cache`. The UI has a built-in stress test under Settings → Diagnostics.
+Benchmarks live in the crates: `cargo bench -p dn-storage`, `cargo bench -p dn-messaging` and `cargo bench -p dn-cache`. The UI has a built-in stress test under Settings → Diagnostics, also runnable from the command line as `discord-native --demo --bench-stress 100000` (prints frame-time statistics and exits). Measured numbers and how they were taken are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Project layout
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use dn_core::{Id, Message, User};
+use dn_core::{Channel, Id, Message, User};
 use serde::{Deserialize, Serialize};
 
 /// `GET /applications/@me`.
@@ -80,6 +80,26 @@ pub struct CreateMessage {
     pub sticker_ids: Vec<Id>,
     pub files: Vec<FileUpload>,
     pub tts: bool,
+}
+
+/// Body of `POST /channels/{id}/threads` for forum and media channels.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct CreateForumPost {
+    /// Post title, 1-100 characters.
+    pub name: String,
+    /// Opening message; `content`, `sticker_ids`, `files` and `mention_replied_user` are used.
+    pub message: CreateMessage,
+    /// Up to five tag ids from the channel's `available_tags`.
+    pub applied_tags: Vec<Id>,
+}
+
+/// Response to [`CreateForumPost`]: the new thread with its opening message nested.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+pub struct ForumPost {
+    #[serde(flatten)]
+    pub channel: Channel,
+    #[serde(default)]
+    pub message: Option<Message>,
 }
 
 #[derive(Clone, Default, PartialEq)]

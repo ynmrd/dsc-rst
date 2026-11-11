@@ -26,7 +26,7 @@ Discord Native therefore uses only the following:
 | Servers, channels, categories, permissions | Supported as bot | GUILD_CREATE plus permission calculation |
 | Send, receive, edit, delete; replies, mentions | Supported as bot | REST v10 plus gateway; MESSAGE_CONTENT intent (privileged) |
 | Reactions, custom emoji | Supported as bot | Emoji from servers the bot is in |
-| Stickers | Partial | PNG/APNG/GIF are shown; Lottie is not; sending only guild stickers |
+| Stickers | Partial | PNG/APNG/GIF are shown; Lottie is not; the sticker picker sends the current server's stickers (Discord only accepts same-server stickers in `sticker_ids`) |
 | GIF picker | **Blocked** | The Tenor API shut down in 2026 and Discord's own picker uses private endpoints; GIF links and embeds are displayed |
 | File upload/download, image previews, embeds | Supported as bot | multipart `files[n]`, media-proxy resize |
 | History, incremental loading | Supported as bot | `GET /channels/{id}/messages` with before/after/around, plus local SQLite cache |
@@ -35,7 +35,7 @@ Discord Native therefore uses only the following:
 | Unread markers, mentions | Partial | Bots have no server-side read state, so it is kept locally |
 | Typing indicators | Supported as bot | GUILD_MESSAGE_TYPING / DIRECT_MESSAGE_TYPING |
 | Notifications | Supported | Windows toasts (AppUserModelID registered in HKCU) |
-| Threads | Supported as bot | Viewing, writing, creating from a message; creating forum posts is not implemented |
+| Threads, forum posts | Supported as bot | Viewing, writing, creating threads from a message; new forum/media posts with title, tags (`REQUIRE_TAG` and moderated tags respected) and attachments via `POST /channels/{id}/threads` |
 | DMs | Partial | Only the bot's DMs; the user's personal DMs are unavailable |
 | Group DMs, friends, friend requests | **Blocked** | Not available to bots or OAuth applications |
 | Others' presence | Supported as bot | GUILD_PRESENCES (privileged) |

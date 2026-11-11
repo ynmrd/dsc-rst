@@ -45,8 +45,11 @@ impl MetricsSampler {
     }
 
     pub fn sample(&mut self) -> ProcessSample {
-        let now = Instant::now();
-        let window = now.duration_since(self.last_wall);
+        self.sample_at(Instant::now())
+    }
+
+    fn sample_at(&mut self, now: Instant) -> ProcessSample {
+        let window = now.saturating_duration_since(self.last_wall);
         if window >= MIN_CPU_WINDOW
             && let (Some(prev), Some(cur)) = (self.last_cpu, platform::cpu_time())
         {
@@ -241,10 +244,16 @@ mod tests {
 
     #[test]
     fn rapid_resampling_keeps_last_cpu_figure() {
+        // Explicit timestamps: with real clocks, the Windows thread snapshot taken inside
+        // `sample()` can itself exceed MIN_CPU_WINDOW on a busy machine.
         let mut s = MetricsSampler::new();
-        std::thread::sleep(Duration::from_millis(30));
-        let first = s.sample();
-        let second = s.sample();
+        let t0 = s.last_wall;
+        let first = s.sample_at(t0 + MIN_CPU_WINDOW + Duration::from_millis(10));
+        let second = s.sample_at(t0 + MIN_CPU_WINDOW + Duration::from_millis(15));
         assert_eq!(first.cpu_percent, second.cpu_percent);
+        // A full window later the figure is recomputed from the new delta.
+        let third = s.sample_at(t0 + 3 * MIN_CPU_WINDOW);
+        assert!((0.0..=100.0).contains(&third.cpu_percent));
+        assert_eq!(s.last_wall, t0 + 3 * MIN_CPU_WINDOW);
     }
 }
