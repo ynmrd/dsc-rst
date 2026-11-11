@@ -1618,25 +1618,26 @@ dependencies = [
 name = "dn-client"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "crossbeam-channel",
  "dn-api",
  "dn-audio",
  "dn-auth",
+ "dn-cache",
  "dn-core",
- "dn-diagnostics",
  "dn-gateway",
- "dn-media",
- "dn-messaging",
  "dn-notifications",
  "dn-settings",
  "dn-storage",
  "dn-voice",
+ "futures-util",
  "parking_lot 0.12.5",
- "serde",
+ "rand 0.9.5",
  "serde_json",
+ "tempfile",
  "tokio",
+ "tokio-tungstenite 0.26.2",
  "tracing",
+ "winreg",
+ "wiremock",
 ]
 
 [[package]]
@@ -1684,14 +1685,19 @@ dependencies = [
 name = "dn-media"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-channel",
+ "dn-core",
  "image",
  "lru",
  "parking_lot 0.12.5",
  "reqwest",
  "sha2",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
+ "url",
+ "wiremock",
 ]
 
 [[package]]
@@ -8696,6 +8702,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "winreg"
+version = "0.56.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
+dependencies = [
+ "cfg-if",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

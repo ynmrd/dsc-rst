@@ -98,9 +98,10 @@ impl ChannelMessages {
         self.loaded_once = true;
         match older_than {
             None => {
-                // Latest page replaces the window if it doesn't connect to what we have.
-                let connects = match (page.last(), self.messages.front()) {
-                    (Some(last), Some(front)) => last.id >= front.id,
+                // Latest page replaces the window unless it overlaps what we have; merging a
+                // non-overlapping page would leave an invisible hole in the history.
+                let connects = match (page.first(), self.messages.back()) {
+                    (Some(first), Some(back)) => first.id <= back.id,
                     _ => false,
                 };
                 if !connects {
