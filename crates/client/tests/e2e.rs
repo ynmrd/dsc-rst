@@ -350,9 +350,7 @@ async fn edits_to_messages_outside_open_channels_reach_the_cache() {
     add_bot_and_wait_ready(&h).await;
 
     let send = |t: &str, d: Value| gw.dispatch.send((t.to_string(), d)).unwrap();
-    let edit = |id: u64, content: &str| {
-        json!({"id": id.to_string(), "channel_id": CHANNEL.to_string(), "content": content, "edited_timestamp": "2026-01-01T00:01:00+00:00"})
-    };
+    let edit = |id: u64, content: &str| json!({"id": id.to_string(), "channel_id": CHANNEL.to_string(), "content": content, "edited_timestamp": "2026-01-01T00:01:00+00:00"});
     // Edited after the message reached SQLite.
     send("MESSAGE_CREATE", msg_json(970, "2", "before edit"));
     tokio::time::sleep(Duration::from_millis(1600)).await;

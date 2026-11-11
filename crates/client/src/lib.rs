@@ -361,8 +361,10 @@ impl Backend {
             }
             Internal::VoiceTimeout(join_gen) => {
                 if join_gen == self.voice_join_gen {
-                    let still_connecting =
-                        matches!(self.store().voice.conn, dn_cache::VoiceConn::Connecting { .. } | dn_cache::VoiceConn::Reconnecting { .. });
+                    let still_connecting = matches!(
+                        self.store().voice.conn,
+                        dn_cache::VoiceConn::Connecting { .. } | dn_cache::VoiceConn::Reconnecting { .. }
+                    );
                     if still_connecting {
                         self.voice_failed(
                             "Timed out waiting for Discord's voice server. Check that the bot has Connect permission.".into(),

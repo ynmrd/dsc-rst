@@ -87,7 +87,8 @@ impl Backend {
             return;
         }
         let rejoining = self.voice_pending.as_ref().is_some_and(|p| p.rejoining);
-        let keep_session = self.voice_pending.as_ref().filter(|p| p.guild_id == guild_id && !p.rejoining).and_then(|p| p.session_id.clone());
+        let keep_session =
+            self.voice_pending.as_ref().filter(|p| p.guild_id == guild_id && !p.rejoining).and_then(|p| p.session_id.clone());
         self.voice_pending = Some(PendingVoice {
             guild_id,
             channel_id,
@@ -278,11 +279,11 @@ impl Backend {
     }
 
     pub(crate) fn handle_voice_event(&mut self, ev: VoiceEvent) {
-        if matches!(ev, VoiceEvent::State(dn_voice::VoiceState::Connected { .. })) {
-            if let Some(p) = self.voice_pending.as_mut() {
-                p.retries = 0;
-                p.rejoining = false;
-            }
+        if matches!(ev, VoiceEvent::State(dn_voice::VoiceState::Connected { .. }))
+            && let Some(p) = self.voice_pending.as_mut()
+        {
+            p.retries = 0;
+            p.rejoining = false;
         }
         let target = self.voice_pending.as_ref().map(|p| (p.guild_id, p.channel_id));
         let mut s = self.store();
@@ -299,7 +300,8 @@ impl Backend {
                     let _ = self.internal.send(Internal::VoiceConnectFailed(e));
                     return;
                 }
-                (dn_voice::VoiceState::Idle, None) => s.voice.conn = VoiceConn::Idle,
+                // The driver reports Idle after we tear it down; keep a failure visible.
+                (dn_voice::VoiceState::Idle, None) if !matches!(s.voice.conn, VoiceConn::Failed(_)) => s.voice.conn = VoiceConn::Idle,
                 _ => {}
             },
             VoiceEvent::Speaking { user_id, speaking } => {
