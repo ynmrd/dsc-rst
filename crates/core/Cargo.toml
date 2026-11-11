@@ -1,0 +1,12 @@
+[package]
+name = "dn-core"
+description = "Shared Discord data model, snowflake IDs, permissions and gateway dispatch types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true

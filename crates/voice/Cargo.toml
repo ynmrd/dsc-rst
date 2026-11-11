@@ -1,0 +1,16 @@
+[package]
+name = "dn-voice"
+description = "Discord voice connections via songbird (DAVE E2EE), mixing, speaking indicators"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dn-core.workspace = true
+dn-audio.workspace = true
+songbird.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+thiserror.workspace = true
+async-trait = "0.1"

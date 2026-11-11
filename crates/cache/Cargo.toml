@@ -1,0 +1,22 @@
+[package]
+name = "dn-cache"
+description = "In-memory client state store fed by gateway dispatches, with bounded message windows"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dn-core.workspace = true
+dn-settings.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+crossbeam-channel.workspace = true
+tokio = { workspace = true, default-features = false }
+
+[dev-dependencies]
+serde_json.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "store"
+harness = false

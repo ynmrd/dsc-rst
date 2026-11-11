@@ -1,0 +1,18 @@
+[package]
+name = "dn-messaging"
+description = "Discord-flavoured Markdown parser, mention/emoji helpers and message grouping"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dn-core.workspace = true
+emojis.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "markdown"
+harness = false

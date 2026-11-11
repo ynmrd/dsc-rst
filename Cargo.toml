@@ -1,0 +1,105 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+default-members = ["crates/app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ynmrd/dsc-rst"
+authors = ["Discord Native contributors"]
+
+[workspace.dependencies]
+# Internal crates
+dn-core = { path = "crates/core" }
+dn-api = { path = "crates/api" }
+dn-gateway = { path = "crates/gateway" }
+dn-auth = { path = "crates/auth" }
+dn-storage = { path = "crates/storage" }
+dn-cache = { path = "crates/cache" }
+dn-messaging = { path = "crates/messaging" }
+dn-audio = { path = "crates/audio" }
+dn-voice = { path = "crates/voice" }
+dn-media = { path = "crates/media" }
+dn-notifications = { path = "crates/notifications" }
+dn-settings = { path = "crates/settings" }
+dn-diagnostics = { path = "crates/diagnostics" }
+dn-client = { path = "crates/client" }
+dn-ui = { path = "crates/ui" }
+
+# Foundation
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+url = "2"
+bytes = "1"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+rand = "0.9"
+base64 = "0.22"
+sha2 = "0.10"
+lru = "0.16"
+
+# Async + networking
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "fs"] }
+tokio-util = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "stream", "gzip"] }
+tokio-tungstenite = { version = "0.26", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+flate2 = "1"
+
+# Storage
+rusqlite = { version = "0.42", features = ["bundled"] }
+keyring = "3"
+directories = "6"
+
+# Media / audio
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+cpal = "0.18"
+songbird = { version = "0.6", default-features = false, features = ["driver", "rustls", "tungstenite", "receive"] }
+nnnoiseless = { version = "0.5", default-features = false }
+
+# UI
+eframe = { version = "0.37", default-features = false, features = ["wgpu", "glow", "default_fonts", "accesskit", "wayland", "x11", "clipboard", "links"] }
+egui = "0.37"
+egui_kittest = "0.37"
+emojis = "0.9"
+
+# Desktop integration
+notify-rust = "4"
+open = "5"
+rfd = { version = "0.18", default-features = false, features = ["xdg-portal"] }
+arboard = { version = "3", default-features = false }
+
+# Testing
+wiremock = "0.6"
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "unwind"
+debug = false
+
+# Fast-to-build release variant for CI smoke tests and local profiling.
+[profile.release-fast]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false

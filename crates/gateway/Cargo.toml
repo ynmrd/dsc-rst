@@ -1,0 +1,26 @@
+[package]
+name = "dn-gateway"
+description = "Discord gateway v10 WebSocket client: heartbeat, identify, resume, reconnect, zlib-stream"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dn-core.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+flate2.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+url.workspace = true
+# Explicit crypto provider: tokio-tungstenite's default TLS config panics unless exactly
+# one rustls provider feature is enabled process-wide.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

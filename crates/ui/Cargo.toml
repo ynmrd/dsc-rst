@@ -1,0 +1,13 @@
+[package]
+name = "dn-ui"
+description = "Native egui/wgpu user interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dn-core.workspace = true
+egui.workspace = true
+eframe.workspace = true
+tracing.workspace = true
+chrono.workspace = true

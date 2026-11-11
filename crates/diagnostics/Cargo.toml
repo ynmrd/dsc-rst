@@ -1,0 +1,18 @@
+[package]
+name = "dn-diagnostics"
+description = "Logging, crash reports and process resource metrics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+chrono.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_Foundation", "Win32_System_Diagnostics_ToolHelp"] }
+
+[dev-dependencies]
+tempfile.workspace = true

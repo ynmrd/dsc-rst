@@ -1,0 +1,27 @@
+[package]
+name = "dn-client"
+description = "Backend orchestrator: wires API, gateway, storage, voice and auth; UI command/event bus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dn-core.workspace = true
+dn-api.workspace = true
+dn-gateway.workspace = true
+dn-auth.workspace = true
+dn-storage.workspace = true
+dn-voice.workspace = true
+dn-audio.workspace = true
+dn-media.workspace = true
+dn-notifications.workspace = true
+dn-settings.workspace = true
+dn-diagnostics.workspace = true
+dn-messaging.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+crossbeam-channel.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true

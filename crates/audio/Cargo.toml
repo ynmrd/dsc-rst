@@ -1,0 +1,14 @@
+[package]
+name = "dn-audio"
+description = "Audio device management (CPAL), capture/playback and voice DSP"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cpal.workspace = true
+nnnoiseless.workspace = true
+parking_lot.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+crossbeam-channel.workspace = true
