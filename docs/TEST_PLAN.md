@@ -46,4 +46,6 @@ Record the results in [BENCHMARKS.md](BENCHMARKS.md).
 
 | Date | Build | Machine | Items run | Result | Notes |
 |---|---|---|---|---|---|
-| — | — | — | none yet | — | — |
+| 2026-11-11 | b516a05, debug | Linux sandbox, Xvfb, llvmpipe (not Windows) | 3a in `--demo` | Passed (demo only) | Forum post with title, Markdown body and tag created and opened; sticker sent from the picker. No real Discord connection, so the second-account checks are still open |
+| 2026-11-11 | b516a05, `release-fast` | Same sandbox | 1 (first frame only), 12 (stress test 100k), 14 (idle CPU) | Recorded | Numbers in [BENCHMARKS.md](BENCHMARKS.md). Software rendering, so not representative of real hardware |
+| 2026-11-11 | b516a05, `release-fast`, cross-built `x86_64-pc-windows-gnu` | Same sandbox, Wine 9.0 | `--version`, `--self-check --network`, `--demo --software-render` | Passed under Wine | Self-check: SQLite/FTS5, credential store, Discord API and gateway (placeholder token rejected as expected). Demo UI renders. Wine is not Windows; items 1–16 still need a real machine |
