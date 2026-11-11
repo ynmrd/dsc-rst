@@ -43,6 +43,8 @@ pub struct UiOptions {
     pub use_system_fonts: bool,
     /// Called when the user chooses "close to tray" so the shell can show a tray icon.
     pub has_tray: bool,
+    /// The shell polls the push-to-talk key globally (Windows); skip the in-window check.
+    pub global_ptt: bool,
 }
 
 pub struct DiscordApp {
@@ -57,6 +59,7 @@ pub struct DiscordApp {
     last_frame: Option<Instant>,
     md_cache: HashMap<(Id, u64), Arc<Vec<Block>>>,
     has_tray: bool,
+    global_ptt: bool,
     quit_requested: bool,
     focus_sent: Option<bool>,
     pending_open: Option<Id>,
@@ -66,8 +69,7 @@ impl DiscordApp {
     pub fn new(ctx: &egui::Context, link: UiLink, opts: UiOptions) -> Self {
         ctx.set_fonts(fonts::definitions(opts.use_system_fonts));
         let theme = link.settings.read().appearance.theme;
-        let mut st = UiState::default();
-        st.window_focused = true;
+        let st = UiState { window_focused: true, ..Default::default() };
         let repaint_ctx = ctx.clone();
         link.repaint.install(move |d| {
             if d.is_zero() { repaint_ctx.request_repaint() } else { repaint_ctx.request_repaint_after(d) }
@@ -84,6 +86,7 @@ impl DiscordApp {
             last_frame: None,
             md_cache: HashMap::new(),
             has_tray: opts.has_tray,
+            global_ptt: opts.global_ptt,
             quit_requested: false,
             focus_sent: None,
             pending_open: None,
@@ -116,7 +119,7 @@ impl DiscordApp {
             match ev {
                 UiEvent::Toast { text, error } => self.st.toast(text, error),
                 UiEvent::SearchResults { request, total, messages, source, note } => {
-                    if self.st.search.last.as_ref() == Some(&request) {
+                    if self.st.search.last.as_ref() == Some(&*request) {
                         self.st.search.loading = false;
                         self.st.search.total = total;
                         if request.offset == 0 {
@@ -130,9 +133,15 @@ impl DiscordApp {
                 }
                 UiEvent::Pins { channel_id, messages } => self.st.pins = Some((channel_id, messages, true)),
                 UiEvent::Profile { user, member, .. } => {
-                    self.st.profiles.insert(user.id, (user, member));
+                    self.st.profiles.insert(user.id, (*user, member.map(|m| *m)));
                 }
-                UiEvent::OpenChannel(c) => self.pending_open = Some(c),
+                UiEvent::OpenChannel(c) => {
+                    self.pending_open = Some(c);
+                    // Also used for toast clicks: bring the window back from the tray.
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+                }
                 UiEvent::OAuthFinished(r) => {
                     self.st.onboarding.oauth_busy = false;
                     match r {
@@ -201,7 +210,7 @@ impl DiscordApp {
         }
         if search && self.st.selected_guild.is_some() {
             self.st.search.open = true;
-            ctx.memory_mut(|m| m.request_focus(egui::Id::new("search-box")));
+            ctx.memory_mut(|m| m.request_focus(egui::Id::unique("search-box")));
         }
         if escape {
             if self.st.modal.is_some() {
@@ -210,23 +219,21 @@ impl DiscordApp {
                 self.st.emoji_picker = None;
             } else if self.st.editing.is_some() {
                 self.st.editing = None;
-            } else if let Some(c) = self.st.selected_channel {
-                if self.st.composer(c).reply_to.take().is_none() {
-                    if let Some(last) = store.channels.get(&c).and_then(|ch| ch.last_message_id) {
+            } else if let Some(c) = self.st.selected_channel
+                && self.st.composer(c).reply_to.take().is_none()
+                    && let Some(last) = store.channels.get(&c).and_then(|ch| ch.last_message_id) {
                         self.link.send(Command::MarkRead { channel_id: c, message_id: last });
                     }
-                }
-            }
         }
         if alt_up || alt_down {
             self.step_channel(store, if alt_up { -1 } else { 1 });
         }
         // In-window push-to-talk (a global key watcher in the shell covers unfocused windows on Windows).
         let ptt_mode = matches!(self.link.settings.read().voice.input_mode, dn_settings::InputMode::PushToTalk);
-        if ptt_mode && store.voice.conn.channel().is_some() {
+        if ptt_mode && !self.global_ptt && store.voice.conn.channel().is_some() {
             let key = self.link.settings.read().voice.ptt_key.clone();
             if let Some(k) = Key::from_name(&key) {
-                let down = ctx.input(|i| i.key_down(k)) && !ctx.wants_keyboard_input();
+                let down = ctx.input(|i| i.key_down(k)) && !ctx.egui_wants_keyboard_input();
                 if down != self.st.ptt_down {
                     self.st.ptt_down = down;
                     self.link.send(Command::PushToTalk(down));
@@ -276,11 +283,10 @@ impl DiscordApp {
         list.anchor = None;
         // The backend serves cached history immediately and refreshes the latest page.
         self.link.send(Command::OpenChannel { channel_id: channel });
-        if let Some(g) = guild {
-            if store.guilds.get(&g).is_some_and(|gs| !gs.members_requested) {
+        if let Some(g) = guild
+            && store.guilds.get(&g).is_some_and(|gs| !gs.members_requested) {
                 self.link.send(Command::RequestMembers { guild_id: g });
             }
-        }
     }
 
     pub fn select_guild(&mut self, store: &mut Store, guild: Option<Id>) {
@@ -312,7 +318,7 @@ impl DiscordApp {
             return;
         }
         let p = self.palette;
-        egui::Area::new(egui::Id::new("toasts"))
+        egui::Area::new(egui::Id::unique("toasts"))
             .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-16.0, -80.0))
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
@@ -333,7 +339,7 @@ impl DiscordApp {
     }
 
     fn handle_dropped_files(&mut self, ctx: &egui::Context) {
-        let files: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect());
+        let files: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).filter(|p| !p.as_os_str().is_empty()).collect());
         if files.is_empty() {
             return;
         }
@@ -348,22 +354,20 @@ impl DiscordApp {
     }
 
     fn poll_dialogs(&mut self) {
-        if let Some(rx) = &self.st.file_dialog_rx {
-            if let Ok((channel, files)) = rx.try_recv() {
+        if let Some(rx) = &self.st.file_dialog_rx
+            && let Ok((channel, files)) = rx.try_recv() {
                 let comp = self.st.composer(channel);
                 comp.attachments.extend(files);
                 comp.attachments.truncate(10);
                 self.st.file_dialog_rx = None;
             }
-        }
-        if let Some(rx) = &self.st.save_dialog_rx {
-            if let Ok((url, path)) = rx.try_recv() {
+        if let Some(rx) = &self.st.save_dialog_rx
+            && let Ok((url, path)) = rx.try_recv() {
                 if let Some(path) = path {
                     self.link.send(Command::DownloadTo { url, path });
                 }
                 self.st.save_dialog_rx = None;
             }
-        }
     }
 
     fn frame_metrics(&mut self) {
@@ -390,11 +394,10 @@ impl DiscordApp {
 impl DiscordApp {
     #[allow(clippy::needless_pass_by_ref_mut)]
     fn apply_pending_open(&mut self, store: &mut Store) {
-        if let Some(c) = self.pending_open.take() {
-            if store.channels.contains_key(&c) {
+        if let Some(c) = self.pending_open.take()
+            && store.channels.contains_key(&c) {
                 self.open_channel(store, c);
             }
-        }
     }
 }
 
@@ -441,7 +444,7 @@ impl eframe::App for DiscordApp {
         self.toasts(&ctx);
     }
 
-    fn on_exit(&mut self) {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.link.send(Command::Shutdown);
     }
 }
@@ -449,6 +452,17 @@ impl eframe::App for DiscordApp {
 impl DiscordApp {
     fn main_layout(&mut self, ui: &mut Ui, store: &mut Store) {
         let p = self.palette;
+        if store.session.demo {
+            egui::Panel::top("demo-banner")
+                .exact_size(26.0)
+                .resizable(false)
+                .frame(egui::Frame::new().fill(p.yellow))
+                .show(ui, |ui| {
+                    ui.centered_and_justified(|ui| {
+                        ui.label(egui::RichText::new("Offline demo data — not connected to Discord. Start without --demo to connect your bot.").color(Color32::BLACK).strong());
+                    });
+                });
+        }
         if self.st.selected_channel.is_none() && store.session.ready && !store.guild_order.is_empty() && self.st.selected_guild.is_none() {
             let first = store.guild_order.first().copied();
             self.select_guild(store, first);

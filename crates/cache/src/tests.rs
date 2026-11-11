@@ -249,7 +249,7 @@ fn thread_archive_and_guild_delete() {
     assert!(!s.guilds[&Id(G)].available);
     s.apply(&d("GUILD_DELETE", serde_json::json!({"id":"1"})));
     assert!(s.guilds.is_empty());
-    assert!(s.channels.get(&Id(10)).is_none());
+    assert!(!s.channels.contains_key(&Id(10)));
 }
 
 #[test]

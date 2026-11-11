@@ -61,7 +61,7 @@ pub fn definitions(use_system: bool) -> FontDefinitions {
     let base_prop = defs.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
     let base_mono = defs.families.get(&FontFamily::Monospace).cloned().unwrap_or_default();
 
-    let mut add = |defs: &mut FontDefinitions, name: &str, data: Option<Arc<FontData>>| -> Option<String> {
+    let add = |defs: &mut FontDefinitions, name: &str, data: Option<Arc<FontData>>| -> Option<String> {
         data.map(|d| {
             defs.font_data.insert(name.to_string(), d);
             name.to_string()

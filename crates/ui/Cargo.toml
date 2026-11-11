@@ -7,7 +7,15 @@ license.workspace = true
 
 [dependencies]
 dn-core.workspace = true
+dn-cache.workspace = true
+dn-messaging.workspace = true
+dn-settings.workspace = true
+dn-media.workspace = true
+dn-diagnostics.workspace = true
 egui.workspace = true
 eframe.workspace = true
 tracing.workspace = true
 chrono.workspace = true
+crossbeam-channel.workspace = true
+rfd.workspace = true
+open.workspace = true

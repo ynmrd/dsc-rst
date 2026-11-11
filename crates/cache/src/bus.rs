@@ -78,9 +78,9 @@ pub enum SearchSource {
 #[derive(Debug, Clone)]
 pub enum UiEvent {
     Toast { text: String, error: bool },
-    SearchResults { request: SearchRequest, total: u64, messages: Vec<Message>, source: SearchSource, note: Option<String> },
+    SearchResults { request: Box<SearchRequest>, total: u64, messages: Vec<Message>, source: SearchSource, note: Option<String> },
     Pins { channel_id: Id, messages: Vec<Message> },
-    Profile { user: User, member: Option<Member>, guild_id: Option<Id> },
+    Profile { user: Box<User>, member: Option<Box<Member>>, guild_id: Option<Id> },
     OpenChannel(Id),
     OAuthFinished(Result<String, String>),
     AccountAdded(Result<String, String>),
@@ -89,7 +89,9 @@ pub enum UiEvent {
 
 /// Repaint hook installed by the UI once the egui context exists.
 #[derive(Clone, Default)]
-pub struct Repaint(Arc<OnceLock<Box<dyn Fn(Duration) + Send + Sync>>>);
+pub struct Repaint(Arc<OnceLock<RepaintFn>>);
+
+type RepaintFn = Box<dyn Fn(Duration) + Send + Sync>;
 
 impl Repaint {
     pub fn install(&self, f: impl Fn(Duration) + Send + Sync + 'static) {

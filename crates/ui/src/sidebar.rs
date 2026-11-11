@@ -37,13 +37,12 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store) {
     ui.painter().hline(rect.x_range(), rect.bottom(), egui::Stroke::new(1.0, p.rail));
     if let Some(gid) = app.st.selected_guild {
         resp.context_menu(|ui| {
-            if let Some(app_id) = store.session.application_id {
-                if ui.button("Invite the bot to another server").clicked() {
+            if let Some(app_id) = store.session.application_id
+                && ui.button("Invite the bot to another server").clicked() {
                     let url = invite_url(app_id, None);
                     ui.ctx().open_url(egui::OpenUrl::new_tab(url));
                     ui.close();
                 }
-            }
             if app.link.settings.read().behavior.developer_mode && ui.button("Copy server ID").clicked() {
                 ui.ctx().copy_text(gid.to_string());
                 ui.close();
@@ -68,7 +67,8 @@ pub fn show(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store) {
 }
 
 fn guild_channels(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, guild: Id, p: &Palette) {
-    let tree: Vec<(Option<(Id, String)>, Vec<Channel>)> = store
+    type Group = (Option<(Id, String)>, Vec<Channel>);
+    let tree: Vec<Group> = store
         .channel_tree(guild)
         .into_iter()
         .map(|g| (g.category.map(|c| (c.id, c.display_name())), g.channels.into_iter().cloned().collect()))
@@ -94,7 +94,8 @@ fn guild_channels(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, guild: I
             }
             if collapsed {
                 // Collapsed categories still show the selected channel and unread ones.
-                for c in channels.iter().filter(|c| app.st.selected_channel == Some(c.id) || store.is_unread(c.id)) {
+                let visible: Vec<Channel> = channels.iter().filter(|c| app.st.selected_channel == Some(c.id) || store.is_unread(c.id)).cloned().collect();
+                for c in &visible {
                     channel_row(app, ui, store, c, p, 0.0);
                 }
                 continue;
@@ -158,13 +159,11 @@ fn channel_row(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, c: &Channel
         ui.painter().with_clip_rect(ui.ctx().content_rect()).rect_filled(r, CornerRadius::same(4), p.text_strong);
     }
     if resp.clicked() {
-        if c.kind.is_voice() {
-            if let Some(g) = c.guild_id {
-                if !in_voice {
+        if c.kind.is_voice()
+            && let Some(g) = c.guild_id
+                && !in_voice {
                     app.link.send(Command::JoinVoice { guild_id: g, channel_id: c.id });
                 }
-            }
-        }
         app.open_channel(store, c.id);
     }
     let topic = c.topic.clone();
@@ -179,19 +178,17 @@ fn channel_row(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, c: &Channel
                     app.link.send(Command::LeaveVoice);
                     ui.close();
                 }
-            } else if let Some(g) = c.guild_id {
-                if ui.button("Join voice").clicked() {
+            } else if let Some(g) = c.guild_id
+                && ui.button("Join voice").clicked() {
                     app.link.send(Command::JoinVoice { guild_id: g, channel_id: c.id });
                     ui.close();
                 }
-            }
         }
-        if let Some(last) = c.last_message_id {
-            if ui.button("Mark as read").clicked() {
+        if let Some(last) = c.last_message_id
+            && ui.button("Mark as read").clicked() {
                 app.link.send(Command::MarkRead { channel_id: c.id, message_id: last });
                 ui.close();
             }
-        }
         let label = if muted { "Unmute channel" } else { "Mute channel" };
         if ui.button(label).clicked() {
             {
@@ -325,11 +322,10 @@ fn voice_panel(app: &mut DiscordApp, ui: &mut Ui, store: &mut Store, p: &Palette
                 if widgets::icon_button(ui, p, "📞", "Disconnect", Some(p.red)).clicked() {
                     app.link.send(Command::LeaveVoice);
                 }
-                if let Some(c) = channel {
-                    if widgets::icon_button(ui, p, "💬", "Open voice channel chat", None).clicked() {
+                if let Some(c) = channel
+                    && widgets::icon_button(ui, p, "💬", "Open voice channel chat", None).clicked() {
                         app.open_channel(store, c);
                     }
-                }
             });
         });
     });
