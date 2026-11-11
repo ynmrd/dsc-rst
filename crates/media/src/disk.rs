@@ -8,8 +8,8 @@ use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
 use url::Url;
 
-/// Prune after this many writes even when the running total looks fine, since the total
-/// is only an estimate (other processes, interrupted writes).
+/// Prune after this many writes (a power of two) even when the running total looks fine,
+/// since the total is only an estimate (other processes, interrupted writes).
 const PRUNE_EVERY_WRITES: u64 = 64;
 /// Leftover temp files from a crashed write are removed once they are this old.
 const STALE_TMP_AGE: Duration = Duration::from_secs(3600);
@@ -114,7 +114,7 @@ impl DiskCache {
         let added = len.saturating_sub(replaced);
         let usage = self.usage.fetch_add(added, Ordering::Relaxed) + added;
         let writes = self.writes.fetch_add(1, Ordering::Relaxed) + 1;
-        if usage > self.budget || writes % PRUNE_EVERY_WRITES == 0 {
+        if usage > self.budget || writes & (PRUNE_EVERY_WRITES - 1) == 0 {
             self.prune();
         }
         Ok(())

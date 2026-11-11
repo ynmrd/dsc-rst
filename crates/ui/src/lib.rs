@@ -201,7 +201,7 @@ impl DiscordApp {
         }
         if search && self.st.selected_guild.is_some() {
             self.st.search.open = true;
-            ctx.memory_mut(|m| m.request_focus(egui::Id::new("search-box")));
+            ctx.memory_mut(|m| m.request_focus(egui::Id::unique("search-box")));
         }
         if escape {
             if self.st.modal.is_some() {
@@ -226,7 +226,7 @@ impl DiscordApp {
         if ptt_mode && store.voice.conn.channel().is_some() {
             let key = self.link.settings.read().voice.ptt_key.clone();
             if let Some(k) = Key::from_name(&key) {
-                let down = ctx.input(|i| i.key_down(k)) && !ctx.wants_keyboard_input();
+                let down = ctx.input(|i| i.key_down(k)) && !ctx.egui_wants_keyboard_input();
                 if down != self.st.ptt_down {
                     self.st.ptt_down = down;
                     self.link.send(Command::PushToTalk(down));
@@ -312,7 +312,7 @@ impl DiscordApp {
             return;
         }
         let p = self.palette;
-        egui::Area::new(egui::Id::new("toasts"))
+        egui::Area::new(egui::Id::unique("toasts"))
             .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-16.0, -80.0))
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
@@ -333,7 +333,7 @@ impl DiscordApp {
     }
 
     fn handle_dropped_files(&mut self, ctx: &egui::Context) {
-        let files: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect());
+        let files: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).filter(|p| !p.as_os_str().is_empty()).collect());
         if files.is_empty() {
             return;
         }
@@ -441,7 +441,7 @@ impl eframe::App for DiscordApp {
         self.toasts(&ctx);
     }
 
-    fn on_exit(&mut self) {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.link.send(Command::Shutdown);
     }
 }
@@ -449,6 +449,17 @@ impl eframe::App for DiscordApp {
 impl DiscordApp {
     fn main_layout(&mut self, ui: &mut Ui, store: &mut Store) {
         let p = self.palette;
+        if store.session.demo {
+            egui::Panel::top("demo-banner")
+                .exact_size(26.0)
+                .resizable(false)
+                .frame(egui::Frame::new().fill(p.yellow))
+                .show(ui, |ui| {
+                    ui.centered_and_justified(|ui| {
+                        ui.label(egui::RichText::new("Offline demo data — not connected to Discord. Start without --demo to connect your bot.").color(Color32::BLACK).strong());
+                    });
+                });
+        }
         if self.st.selected_channel.is_none() && store.session.ready && !store.guild_order.is_empty() && self.st.selected_guild.is_none() {
             let first = store.guild_order.first().copied();
             self.select_guild(store, first);
