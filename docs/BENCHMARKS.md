@@ -52,4 +52,21 @@ Follow "Comparison with the official client" in [TEST_PLAN.md](TEST_PLAN.md) on 
 
 ## Micro-benchmarks
 
-Criterion benchmarks for the storage, Markdown and cache layers are in `crates/storage/benches`, `crates/messaging/benches` and `crates/cache/benches`. Run them with `cargo bench -p dn-storage`, `cargo bench -p dn-messaging` and `cargo bench -p dn-cache`.
+Criterion benchmarks for the storage, Markdown and cache layers are in `crates/storage/benches`, `crates/messaging/benches` and `crates/cache/benches`. Run them with `cargo bench -p dn-storage --bench storage`, `cargo bench -p dn-messaging --bench markdown` and `cargo bench -p dn-cache --bench store`. Append `-- --quick` for a short run; `--quick` works only together with `--bench <name>`, because the libraries' own test harness rejects it.
+
+Same sandbox, 2026-11-11, `--quick` mode (median of the reported range):
+
+| Benchmark | Median |
+|---|---|
+| SQLite: insert 50k messages in batches of 100 | 3.30 s (15.2k msg/s) |
+| SQLite FTS5 search over 50k: common word / 3-char prefix / two terms / no match | 224 µs / 212 µs / 1.25 ms / 69 µs |
+| SQLite search over 50k: common word in one channel / by one author | 0.88 ms / 30.4 ms |
+| SQLite: newest 50 in a channel / page of 50 before the middle / latest id | 139 µs / 143 µs / 14 µs |
+| SQLite: prune 50k → 25k | 0.90 s |
+| Markdown: short message / rich message / 200 KB input | 0.22 µs / 2.86 µs / 3.69 ms |
+| Emoji search / `:shortcode:` replacement / split a 10 KB message | 72.6 µs / 0.15 µs / 49.8 µs |
+| Store: parse and apply GUILD_CREATE (500 channels, 5k members) | 3.12 ms |
+| Store: 10k live MESSAGE_CREATE into the active channel (capped at 3000) | 3.79 ms |
+| Store: channel tree of 500 channels / member list of 5k members | 24.8 µs / 535 µs |
+
+The author-filtered search (30 ms) is the slowest interactive path. It runs on the storage thread, not the UI thread.

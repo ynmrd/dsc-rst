@@ -54,6 +54,8 @@
 - Linux: fmt, clippy `-D warnings`, тесты, self-check с сетью. Зелёный начиная с коммита 4d840b5.
 - Windows (MSVC): тесты, release-сборка, self-check с сетью, NSIS-инсталлятор как артефакт `discord-native-windows-x64` (exe, инсталлятор, `SHA256SUMS.txt`).
 - Итог первой сессии: на Windows тесты, release-сборка и self-check проходили (прогон 43093150909), падал только шаг Installer. Причина: в образе `windows-latest` (Windows Server 2025) больше нет NSIS. Во второй сессии шаг ставит NSIS через Chocolatey, если `makensis.exe` не найден.
+- Второй источник красного Windows CI — нестабильный тест `metrics::tests::rapid_resampling_keeps_last_cpu_figure` (dn-diagnostics). На загруженном раннере снимок потоков внутри `sample()` сам занимал больше 20 мс. Исправлено в 55dc92f: тест передаёт явные метки времени через `sample_at`.
+- Linux-джоб в прогонах для b516a05/1821424 отменён GitHub с сообщением «The job was not acquired by Runner of type hosted even after multiple attempts». Это сбой раннеров, а не кода.
 - Статус прогонов для PR #1: `gh run list --branch hoplite/beroia-c64bcbde`, логи — `gh run view --job <id> --log-failed` (API логов иногда отвечает 502, тогда повторить позже).
 - Каждый пуш в ветку с открытым PR запускает два прогона (push и pull_request). Это ожидаемо.
 
